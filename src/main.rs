@@ -11,6 +11,7 @@ extern crate typenum;
 
 use glium::{glutin, Surface};
 use glium::index::PrimitiveType;
+use nalgebra::Vector3;
 use std::time::{Duration, Instant};
 use std::thread;
 
@@ -127,9 +128,9 @@ fn main() {
     ).unwrap();
 
     let mut camera = camera::CameraState::new();
-    camera.set_direction((1., 0., 0.));
+    //camera.set_direction(Vector3::new(1., 0., 0.));
     //camera.set_position((0., 128., 0.));
-    camera.set_position((0., 0., 0.));
+    //camera.set_position(Vector3::new(0., 0., 0.));
 
     let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
     let params = glium::DrawParameters {
