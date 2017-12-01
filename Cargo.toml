@@ -1,0 +1,10 @@
+[package]
+name = "opensim-client"
+version = "0.1.0"
+authors = ["Leo Schwarz <mail@leoschwarz.com>"]
+
+[dependencies]
+glium = "0.18.1"
+opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
+nalgebra = "0.13.1"
+typenum = "1.9"
