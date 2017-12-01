@@ -112,8 +112,7 @@ impl CameraState {
         );
 
         let s = {
-            let len = s.0 * s.0 + s.1 * s.1 + s.2 * s.2;
-            let len = len.sqrt();
+            let len = (s.0 * s.0 + s.1 * s.1 + s.2 * s.2).sqrt();
             (s.0 / len, s.1 / len, s.2 / len)
         };
 
@@ -158,6 +157,8 @@ impl CameraState {
             self.position.1 -= f.1 * 0.01;
             self.position.2 -= f.2 * 0.01;
         }
+
+        //println!("camera: {:?}", self.position);
     }
 
     pub fn process_input(&mut self, event: &glutin::WindowEvent) {

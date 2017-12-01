@@ -40,19 +40,39 @@ fn main() {
         #[derive(Copy, Clone)]
         struct Vertex {
             position: [f32; 3],
-            color: [f32; 3],
+            //color: [f32; 3],
         }
 
-        implement_vertex!(Vertex, position, color);
+        implement_vertex!(Vertex, position);
 
-        // Convert the heightmap to vertices.
+        // Convert the heightmap to vertices, each grid cell is represented by
+        // two triangles, i.e. 6 vertices.
         let mut vertices = Vec::new();
-        for x in 0..256 {
-            for y in 0..256 {
+        for x1 in 0..255 {
+            for y1 in 0..255 {
+                let x2 = x1 + 1;
+                let y2 = y1 + 1;
+
+                let mut add_vertex = |x: usize, y: usize| {
+                    vertices.push(Vertex {
+                        position: [x as f32, y as f32, terrain.land[(x, y)]]
+                    });
+                };
+
+                add_vertex(x1, y1);
+                add_vertex(x2, y1);
+                add_vertex(x1, y2);
+
+                add_vertex(x2, y2);
+                add_vertex(x1, y2);
+                add_vertex(x2, y1);
+
+                /*
                 vertices.push(Vertex {
                     position: [x as f32, y as f32, terrain.land[(x, y)]],
                     color: [0.0, 1.0, 0.0],
                 });
+                */
             }
         }
 
@@ -103,7 +123,7 @@ fn main() {
     let mut camera = camera::CameraState::new();
 
     //let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
-    let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::Points);
+    let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
     let params = glium::DrawParameters {
         depth: glium::Depth {
             test: glium::DepthTest::IfLess,
