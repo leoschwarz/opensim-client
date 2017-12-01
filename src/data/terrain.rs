@@ -5,24 +5,19 @@ use nalgebra::MatrixN;
 
 pub type PatchMatrix<S> = MatrixN<S, ::typenum::U256>;
 
-pub struct TerrainManager {
-
-}
+pub struct TerrainManager {}
 
 impl TerrainManager {
     pub fn new() -> Self {
         TerrainManager {}
     }
 
-    pub fn get_patch(&mut self, loc: &PatchLocator) -> Result<TerrainDataPatch, ()>
-    {
+    pub fn get_patch(&mut self, loc: &PatchLocator) -> Result<TerrainDataPatch, ()> {
         let data = include!("layer_land.png.txt");
 
         // TODO: dummy implementation
         Ok(TerrainDataPatch {
-            land: PatchMatrix::from_fn(|x, y| {
-                data[x][y]
-            })
+            land: PatchMatrix::from_fn(|x, y| data[x][y]),
         })
     }
 }

@@ -34,4 +34,3 @@ pub struct PointLocator {
     /// Relative position inside of the region.
     pub rel_pos: Vector3<f32>,
 }
-
