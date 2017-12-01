@@ -11,6 +11,8 @@ extern crate typenum;
 
 use glium::{glutin, Surface};
 use glium::index::PrimitiveType;
+use std::time::{Duration, Instant};
+use std::thread;
 
 mod data;
 use self::data::*;
@@ -121,6 +123,7 @@ fn main() {
     ).unwrap();
 
     let mut camera = camera::CameraState::new();
+    camera.set_direction((1., 1., 0.));
 
     //let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
     let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
@@ -152,19 +155,41 @@ fn main() {
     // Draw the triangle to the screen.
     redraw(&camera);
 
-    // the main loop
-    events_loop.run_forever(|event| {
+    // Main loop.
+    let mut accumulator = Duration::new(0,0);
+    let mut previous_clock = Instant::now();
+    loop {
+        // Draw the frame.
         camera.update();
-        match event {
-            glutin::Event::WindowEvent { event, .. } => match event {
-                // Break from the main loop when the window is closed.
-                glutin::WindowEvent::Closed => return glutin::ControlFlow::Break,
-                // Redraw the triangle when the window is resized.
-                glutin::WindowEvent::Resized(..) => redraw(&camera),
-                ev => camera.process_input(&ev),
-            },
-            _ => (),
+        redraw(&camera);
+
+        // Handle events.
+        let mut exit = false;
+        events_loop.poll_events(|event| {
+            match event {
+                glutin::Event::WindowEvent { event, .. } => match event {
+                    glutin::WindowEvent::Closed => exit = true,
+                    ev => camera.process_input(&ev),
+                }
+                _ => {},
+            }
+        });
+        if exit {
+            break;
         }
-        glutin::ControlFlow::Continue
-    });
+
+        // Update clock.
+        let now = Instant::now();
+        accumulator += now - previous_clock;
+        previous_clock = now;
+
+        let fixed_time_step = Duration::new(0, 16666667);
+        while accumulator >= fixed_time_step {
+            accumulator -= fixed_time_step;
+
+            // Update world state.
+        }
+
+        thread::sleep(fixed_time_step - accumulator);
+    }
 }
