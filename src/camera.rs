@@ -174,10 +174,12 @@ impl CameraState {
         match key {
             glutin::VirtualKeyCode::Up => self.moving_up = pressed,
             glutin::VirtualKeyCode::Down => self.moving_down = pressed,
-            glutin::VirtualKeyCode::A => self.moving_left = pressed,
-            glutin::VirtualKeyCode::D => self.moving_right = pressed,
-            glutin::VirtualKeyCode::W => self.moving_forward = pressed,
-            glutin::VirtualKeyCode::S => self.moving_backward = pressed,
+            glutin::VirtualKeyCode::Left => self.moving_left = pressed,
+            glutin::VirtualKeyCode::Right => self.moving_right = pressed,
+            //glutin::VirtualKeyCode::A => self.moving_left = pressed,
+            //glutin::VirtualKeyCode::D => self.moving_right = pressed,
+            //glutin::VirtualKeyCode::W => self.moving_forward = pressed,
+            //glutin::VirtualKeyCode::S => self.moving_backward = pressed,
             _ => (),
         };
     }

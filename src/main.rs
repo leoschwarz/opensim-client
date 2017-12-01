@@ -57,7 +57,7 @@ fn main() {
 
                 let mut add_vertex = |x: usize, y: usize| {
                     vertices.push(Vertex {
-                        position: [x as f32, y as f32, terrain.land[(x, y)]]
+                        position: [x as f32, y as f32, terrain.land[(x, y)]],
                     });
                 };
 
@@ -94,28 +94,32 @@ fn main() {
                 //in vec3 normal;
                 out vec3 v_position;
                 out vec3 v_normal;
+                out float v_color;
 
                 void main() {
                     v_position = position;
                     //v_normal = normal;
                     v_normal = vec3(1.0, 0.0, 0.0);
                     gl_Position = persp_matrix * view_matrix * vec4(v_position * 0.005, 1.0);
+                    v_color = position.z / 24.8;
                 }
             ",
 
             fragment: "
                 #version 140
-                
+
                 in vec3 v_normal;
+                in float v_color;
                 out vec4 f_color;
-                
+
                 const vec3 LIGHT = vec3(-0.2, 0.8, 0.1);
-            
+
                 void main() {
                     //float lum = max(dot(normalize(v_normal), normalize(LIGHT)), 0.0);
                     //vec3 color = (0.3 + 0.7 * lum) * vec3(1.0, 1.0, 1.0);
                     //f_color = vec4(color, 1.0);
-                    f_color = vec4(1., 1., 0., 1.0);
+
+                    f_color = vec4(v_color, 0.5, v_color, 1.0);
                 }
             "
         },
@@ -125,7 +129,6 @@ fn main() {
     let mut camera = camera::CameraState::new();
     camera.set_direction((1., 1., 0.));
 
-    //let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
     let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
     let params = glium::DrawParameters {
         depth: glium::Depth {
@@ -156,7 +159,7 @@ fn main() {
     redraw(&camera);
 
     // Main loop.
-    let mut accumulator = Duration::new(0,0);
+    let mut accumulator = Duration::new(0, 0);
     let mut previous_clock = Instant::now();
     loop {
         // Draw the frame.
@@ -165,14 +168,12 @@ fn main() {
 
         // Handle events.
         let mut exit = false;
-        events_loop.poll_events(|event| {
-            match event {
-                glutin::Event::WindowEvent { event, .. } => match event {
-                    glutin::WindowEvent::Closed => exit = true,
-                    ev => camera.process_input(&ev),
-                }
-                _ => {},
-            }
+        events_loop.poll_events(|event| match event {
+            glutin::Event::WindowEvent { event, .. } => match event {
+                glutin::WindowEvent::Closed => exit = true,
+                ev => camera.process_input(&ev),
+            },
+            _ => {}
         });
         if exit {
             break;
