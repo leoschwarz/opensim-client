@@ -53,14 +53,14 @@ fn main() {
         let mut vertices = Vec::new();
         for x1 in 0..255 {
             for y1 in 0..255 {
-                let x2 = x1 + 1;
-                let y2 = y1 + 1;
-
                 let mut add_vertex = |x: usize, y: usize| {
                     vertices.push(Vertex {
                         position: [x as f32, y as f32, terrain.land[(x, y)]],
                     });
                 };
+
+                let x2 = x1 + 1;
+                let y2 = y1 + 1;
 
                 add_vertex(x1, y1);
                 add_vertex(x2, y1);
@@ -69,13 +69,6 @@ fn main() {
                 add_vertex(x2, y2);
                 add_vertex(x1, y2);
                 add_vertex(x2, y1);
-
-                /*
-                vertices.push(Vertex {
-                    position: [x as f32, y as f32, terrain.land[(x, y)]],
-                    color: [0.0, 1.0, 0.0],
-                });
-                */
             }
         }
 
