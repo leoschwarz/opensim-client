@@ -1,14 +1,19 @@
 //! This module contains the types which represent the data that represents the
 //! state of the simulator and is to be rendered on the screen.
 
-pub use nalgebra::{Vector2, Vector3};
+pub use nalgebra::{Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
+pub use opensim_networking::types::Uuid;
 
+pub mod client_avatar;
 pub mod terrain;
 
 /// Universal Region Locator, points to a specific region on a specific grid.
 #[derive(Clone, Debug)]
 pub struct RegionLocator {
     // TODO: This should probably be an URI
+    // TODO: This will probably be copied around a lot, so consider whether
+    // it might not be too wasteful to every time make a new heap copy of the string.
+    // Maybe a better type could be used here. (Arc<String>?)
     pub grid: String,
     pub reg_pos: Vector2<u32>,
 }
@@ -24,6 +29,8 @@ pub struct PatchLocator {
     pub patch_pos: Vector2<u8>,
 }
 
+/// Universal Point Locator, points to a specific point in a specific region on
+/// a specific grid.
 // TODO
 // Maybe this should be made into trait so it can be used efficiently without allocating
 // or updating in places where positions are to be iterated. (But only do this if such a need

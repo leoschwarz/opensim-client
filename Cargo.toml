@@ -4,7 +4,9 @@ version = "0.1.0"
 authors = ["Leo Schwarz <mail@leoschwarz.com>"]
 
 [dependencies]
+alga = "0.5.2"
 glium = "0.18.1"
-opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
+lazy_static = "1.0.0"
 nalgebra = "0.13.1"
+opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
 typenum = "1.9"
