@@ -1,5 +1,6 @@
 //! Handle the client's avatar.
-use data::{Matrix4, PointLocator, UnitQuaternion,Quaternion, RegionLocator, Uuid, Vector2, Vector3};
+use data::{Matrix4, PointLocator, Quaternion, RegionLocator, UnitQuaternion, Uuid, Vector2,
+           Vector3};
 use std::f32::consts::PI;
 use alga::linear::AffineTransformation;
 use glium::glutin;
@@ -64,10 +65,22 @@ impl ClientAvatar {
 
     pub fn handle_key(&mut self, key: glutin::VirtualKeyCode, pressed: bool) -> bool {
         match key {
-            glutin::VirtualKeyCode::Left => {self.pressed_left = pressed ; true},
-            glutin::VirtualKeyCode::Right => {self.pressed_right = pressed ; true},
-            glutin::VirtualKeyCode::Up => {self.pressed_up = pressed ; true},
-            glutin::VirtualKeyCode::Down => {self.pressed_down = pressed ; true},
+            glutin::VirtualKeyCode::Left => {
+                self.pressed_left = pressed;
+                true
+            }
+            glutin::VirtualKeyCode::Right => {
+                self.pressed_right = pressed;
+                true
+            }
+            glutin::VirtualKeyCode::Up => {
+                self.pressed_up = pressed;
+                true
+            }
+            glutin::VirtualKeyCode::Down => {
+                self.pressed_down = pressed;
+                true
+            }
             _ => false,
         }
     }
@@ -83,9 +96,11 @@ impl ClientAvatar {
 
         let axis = Vector3::z_axis();
         if self.pressed_left {
-            self.head_rotation = self.head_rotation.append_rotation(&UnitQuaternion::from_axis_angle(&axis, 0.1));
+            self.head_rotation = self.head_rotation
+                .append_rotation(&UnitQuaternion::from_axis_angle(&axis, 0.1));
         } else if self.pressed_right {
-            self.head_rotation = self.head_rotation.append_rotation(&UnitQuaternion::from_axis_angle(&axis, -0.1));
+            self.head_rotation = self.head_rotation
+                .append_rotation(&UnitQuaternion::from_axis_angle(&axis, -0.1));
         }
     }
 

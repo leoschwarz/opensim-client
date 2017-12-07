@@ -3,7 +3,6 @@
 // will be added.
 
 /// Target: OpenGL 3.1 for now, so GLSL 1.40 can be used.
-
 extern crate alga;
 #[macro_use]
 extern crate glium;
@@ -155,7 +154,7 @@ fn main() {
     let mut previous_clock = Instant::now();
     loop {
         // Draw the frame.
-        //camera.update();
+        // camera.update();
         redraw(&client_avatar);
 
         // Handle events.
