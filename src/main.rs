@@ -23,8 +23,6 @@ use self::data::*;
 use self::data::terrain::*;
 use self::data::client_avatar::ClientAvatar;
 
-pub mod camera;
-
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new();
