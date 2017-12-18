@@ -10,6 +10,7 @@ extern crate glium;
 extern crate lazy_static;
 extern crate nalgebra;
 extern crate opensim_networking;
+extern crate tokio_core;
 extern crate typenum;
 
 use glium::{glutin, Surface};

@@ -3,7 +3,9 @@ use data::{Matrix4, PointLocator, Quaternion, RegionLocator, UnitQuaternion, Uui
            Vector3};
 use std::f32::consts::PI;
 use alga::linear::AffineTransformation;
+use alga::linear::Similarity;
 use glium::glutin;
+
 
 lazy_static! {
     static ref WORLD_TO_DISPLAY: Matrix4<f32> =
@@ -87,11 +89,14 @@ impl ClientAvatar {
 
     /// Updates according to local movement input.
     pub fn update(&mut self) {
-        // TODO improve
+        // y-axis in the world, z-axis in the rendering.
+        let default_dir = Vector3::y_axis();
+        let fwd = self.head_rotation.rotate_vector(&default_dir);
+        println!("fwd: {:?}", fwd);
         if self.pressed_up {
-            self.loc.rel_pos[0] += 1.;
+            self.loc.rel_pos += fwd;
         } else if self.pressed_down {
-            self.loc.rel_pos[0] -= 1.;
+            self.loc.rel_pos -= fwd;
         }
 
         let axis = Vector3::z_axis();
