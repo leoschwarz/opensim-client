@@ -5,8 +5,10 @@ authors = ["Leo Schwarz <mail@leoschwarz.com>"]
 
 [dependencies]
 alga = "0.5.2"
-glium = "0.18.1"
+glium = "0.19.0"
+#imgui = "0.0.17"
 lazy_static = "1.0.0"
 nalgebra = "0.13.1"
 opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
+tokio-core = "0.1.11"
 typenum = "1.9"
