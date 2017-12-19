@@ -4,6 +4,7 @@
 
 /// Target: OpenGL 3.1 for now, so GLSL 1.40 can be used.
 extern crate alga;
+extern crate futures;
 #[macro_use]
 extern crate glium;
 #[macro_use]
@@ -23,6 +24,8 @@ pub mod data;
 use self::data::*;
 use self::data::terrain::*;
 use self::data::client_avatar::ClientAvatar;
+
+pub mod networking;
 
 fn main() {
     let mut events_loop = glutin::EventsLoop::new();
