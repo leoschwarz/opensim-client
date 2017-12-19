@@ -3,7 +3,9 @@
 
 pub use nalgebra::{Matrix4, MatrixN, DMatrix, Quaternion, UnitQuaternion, Vector2, Vector3};
 pub use opensim_networking::types::Uuid;
+use typenum;
 
+pub mod entities;
 pub mod client_avatar;
 
 // TODO:
@@ -30,10 +32,8 @@ pub mod client_avatar;
 // - This should probably be implemented with an inner struct which can be updated
 //   by the networking thread and use a mutex inside.
 //   (I would prefer RwLock but writer starvation is a big problem for us.)
-/*
 pub struct World {
 }
-*/
 
 pub struct Region {
     /// Side length of the region in meters.
@@ -47,6 +47,14 @@ impl Region {
     }
 }
 
+// TODO:
+// - How to store region data?
+//   For a 8192x8192 with 64e6 f32 values we already have 240 MB of data
+//   just for the land height map, obviously we don't want to store everything
+//   in memory.
+//   - Make TerrainPatch serializable and implement a disk caching strategy,
+//     where patches around the player are kept in memory.
+//   - For now store everything in RAM.
 pub struct Terrain
 {
 }
@@ -76,39 +84,45 @@ impl TerrainPatch {
     }
 }
 
-pub type PatchMatrix<S> = MatrixN<S, ::typenum::U256>;
+pub type PatchMatrix<S> = MatrixN<S, typenum::U256>;
 
-/// Universal Region Locator, points to a specific region on a specific grid.
-#[derive(Clone, Debug)]
-pub struct RegionLocator {
-    // TODO: This should probably be an URI
-    // TODO: This will probably be copied around a lot, so consider whether
-    // it might not be too wasteful to every time make a new heap copy of the string.
-    // Maybe a better type could be used here. (Arc<String>?)
-    pub grid: String,
-    pub reg_pos: Vector2<u32>,
-}
+// TODO: I'm very unhappy with these.
+pub mod locators {
+    use super::*;
 
-/// Locates a patch in a region.
-///
-/// Each region is sliced into 256x256 size patches for these purposes.
-/// (Justification: Maybe 512 might have been a bit more efficient, but it would have made
-///  things more complicated as 256 size regions would have to be handled differently.)
-#[derive(Clone, Debug)]
-pub struct PatchLocator {
-    pub region: RegionLocator,
-    pub patch_pos: Vector2<u8>,
-}
+    /// Universal Region Locator, points to a specific region on a specific grid.
+    #[derive(Clone, Debug)]
+    pub struct RegionLocator {
+        // TODO: This should probably be an URI
+        // TODO: This will probably be copied around a lot, so consider whether
+        // it might not be too wasteful to every time make a new heap copy of the string.
+        // Maybe a better type could be used here. (Arc<String>?)
+        pub grid: String,
+        pub reg_pos: Vector2<u32>,
+    }
 
-/// Universal Point Locator, points to a specific point in a specific region on
-/// a specific grid.
-// TODO
-// Maybe this should be made into trait so it can be used efficiently without allocating
-// or updating in places where positions are to be iterated. (But only do this if such a need
-// really arises and not just for the sake of a nice abstraction... :'))
-#[derive(Clone, Debug)]
-pub struct PointLocator {
-    pub region: RegionLocator,
-    /// Relative position inside of the region.
-    pub rel_pos: Vector3<f32>,
+    /// Locates a patch in a region.
+    ///
+    /// Each region is sliced into 256x256 size patches for these purposes.
+    /// (Justification: Maybe 512 might have been a bit more efficient, but it would have made
+    ///  things more complicated as 256 size regions would have to be handled differently.)
+    #[derive(Clone, Debug)]
+    pub struct PatchLocator {
+        pub region: RegionLocator,
+        pub patch_pos: Vector2<u8>,
+    }
+
+    /// Universal Point Locator, points to a specific point in a specific region on
+    /// a specific grid.
+    // TODO
+    // Maybe this should be made into trait so it can be used efficiently without allocating
+    // or updating in places where positions are to be iterated. (But only do this if such a need
+    // really arises and not just for the sake of a nice abstraction... :'))
+    #[derive(Clone, Debug)]
+    pub struct PointLocator {
+        pub region: RegionLocator,
+        /// Relative position inside of the region.
+        pub rel_pos: Vector3<f32>,
+    }
 }
+use self::locators::*;

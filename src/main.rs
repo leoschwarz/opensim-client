@@ -2,6 +2,9 @@
 // then wander around on the map, and only then actual networking code
 // will be added.
 
+// TODO: Remove at some later time.
+#![allow(dead_code,unused_imports,unused_variables)]
+
 extern crate alga;
 extern crate futures;
 #[macro_use]
@@ -14,8 +17,6 @@ extern crate tokio_core;
 extern crate typenum;
 
 pub mod data;
-use self::data::*;
-use self::data::client_avatar::ClientAvatar;
 
 pub mod networking;
 pub mod render;
