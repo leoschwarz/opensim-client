@@ -1,11 +1,82 @@
 //! This module contains the types which represent the data that represents the
 //! state of the simulator and is to be rendered on the screen.
 
-pub use nalgebra::{Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
+pub use nalgebra::{Matrix4, MatrixN, DMatrix, Quaternion, UnitQuaternion, Vector2, Vector3};
 pub use opensim_networking::types::Uuid;
 
 pub mod client_avatar;
-pub mod terrain;
+
+// TODO:
+// - Should manage the current region and the ones adjacent to it.
+// - For compatibility regions are generally required to be of the same
+//   size as their neighbours, however maybe the code could actually be
+//   written in such a way that in the future different layouts are also
+//   possible.
+//   This could be achieved in the following way:
+//   - Determine a numbering for 256x256 (normal region) surrounding regions
+//     of the current region no matter how big it is.
+//     i. e.
+//     +---+---+---+---+
+//     | 0 | 1 | 2 | 3 |
+//     +---+---+---+---+
+//     |11 |       | 4 |
+//     +---+       +---+
+//     |10 |       | 5 |
+//     +---+---+---+---+
+//     | 9 | 8 | 7 | 6 |
+//     +---+---+---+---+
+//   - Map these values to actual regions in a many-to-one fashion.
+//   - Load the regions in direct proximity of the viewer.
+// - This should probably be implemented with an inner struct which can be updated
+//   by the networking thread and use a mutex inside.
+//   (I would prefer RwLock but writer starvation is a big problem for us.)
+/*
+pub struct World {
+}
+*/
+
+pub struct Region {
+    /// Side length of the region in meters.
+    size: u32,
+}
+
+impl Region {
+    /// Side length of the region in meters.
+    pub fn size(&self) -> u32 {
+        self.size
+    }
+}
+
+pub struct Terrain
+{
+}
+
+impl Terrain {
+    pub fn get_patch(&mut self, pos: Vector2<u8>) -> Result<TerrainPatch, ()>
+    {
+        unimplemented!()
+    }
+}
+
+pub struct TerrainPatch {
+    land_heightmap: PatchMatrix<f32>,
+}
+
+impl TerrainPatch {
+    pub fn land_heightmap(&self) -> &PatchMatrix<f32> {
+        &self.land_heightmap
+    }
+
+    /// TODO: Remove
+    pub fn dummy() -> Self {
+        let raw_data = include!("./layer_land.png.txt");
+        TerrainPatch {
+            land_heightmap: PatchMatrix::from_fn(|x, y| raw_data[x][y]),
+        }
+    }
+}
+
+pub type PatchMatrix<S> = MatrixN<S, ::typenum::U256>;
 
 /// Universal Region Locator, points to a specific region on a specific grid.
 #[derive(Clone, Debug)]
