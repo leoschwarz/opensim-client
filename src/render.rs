@@ -3,7 +3,7 @@
 //! Targets OpenGL 3.1 and GLSL 1.40 for now.
 
 use data;
-use data::client_avatar::ClientAvatar;
+use data::avatar::ClientAvatar;
 use glium::{glutin, Surface, self};
 use glium::index::PrimitiveType;
 use nalgebra::Vector3;

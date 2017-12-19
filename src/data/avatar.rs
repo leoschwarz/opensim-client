@@ -1,4 +1,3 @@
-//! Handle the client's avatar.
 use data::{Matrix4, PointLocator, Quaternion, RegionLocator, UnitQuaternion, Uuid, Vector2,
            Vector3};
 use std::f32::consts::PI;
@@ -6,21 +5,15 @@ use alga::linear::AffineTransformation;
 use alga::linear::Similarity;
 use glium::glutin;
 
-
-lazy_static! {
-    static ref WORLD_TO_DISPLAY: Matrix4<f32> =
-        Matrix4::new(1., 0., 0., 0.,
-                     0., 0., 1., 0.,
-                     0., 1., 0., 0.,
-                     0., 0., 0., 1.);
-}
-
+/// Anything which can be rendered like an avatar.
 pub trait Avatar {
     fn location(&self) -> &PointLocator;
     fn body_rotation(&self) -> &Quaternion<f32>;
     fn head_rotation(&self) -> &Quaternion<f32>;
 }
 
+/// The main avatar of the client, i.e. the one is used for interacting
+/// with the world.
 pub struct ClientAvatar {
     agent_id: Uuid,
     loc: PointLocator,
@@ -35,10 +28,23 @@ pub struct ClientAvatar {
     pressed_down: bool,
 }
 
-impl ClientAvatar {
-    // TODO: See opensim_networking::systems::agent_update.
-    // pub fn to_update_message(&self, session_id: Uuid) -> AgentUpdate
+// TODO
+pub struct OtherAvatar {
 
+}
+
+lazy_static! {
+    static ref WORLD_TO_DISPLAY: Matrix4<f32> =
+        Matrix4::new(1., 0., 0., 0.,
+                     0., 0., 1., 0.,
+                     0., 1., 0., 0.,
+                     0., 0., 0., 1.);
+}
+
+// TODO: See opensim_networking::systems::agent_update.
+// pub fn to_update_message(&self, session_id: Uuid) -> AgentUpdate
+// (note: this belongs into the network module and not here)
+impl ClientAvatar {
     pub fn new() -> Self {
         // TODO dummy
 
@@ -126,6 +132,7 @@ impl ClientAvatar {
         // This converts from camera relative coordinates to screen coordinates.
         Matrix4::new_perspective(aspect, fovy, near, far)
     }
+
 }
 
 impl Avatar for ClientAvatar {
@@ -140,4 +147,6 @@ impl Avatar for ClientAvatar {
     fn head_rotation(&self) -> &Quaternion<f32> {
         &self.head_rotation
     }
+
 }
+

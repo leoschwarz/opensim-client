@@ -5,8 +5,8 @@ pub use nalgebra::{Matrix4, MatrixN, DMatrix, Quaternion, UnitQuaternion, Vector
 pub use opensim_networking::types::Uuid;
 use typenum;
 
+pub mod avatar;
 pub mod entities;
-pub mod client_avatar;
 
 // TODO:
 // - Should manage the current region and the ones adjacent to it.
