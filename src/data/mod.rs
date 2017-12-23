@@ -44,6 +44,10 @@ impl Region {
     pub fn size(&self) -> u32 {
         self.size
     }
+
+    pub fn terrain(&self) -> Terrain {
+        unimplemented!()
+    }
 }
 
 // TODO:
