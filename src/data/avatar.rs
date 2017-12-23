@@ -29,9 +29,7 @@ pub struct ClientAvatar {
 }
 
 // TODO
-pub struct OtherAvatar {
-
-}
+pub struct OtherAvatar {}
 
 lazy_static! {
     static ref WORLD_TO_DISPLAY: Matrix4<f32> =
@@ -132,7 +130,6 @@ impl ClientAvatar {
         // This converts from camera relative coordinates to screen coordinates.
         Matrix4::new_perspective(aspect, fovy, near, far)
     }
-
 }
 
 impl Avatar for ClientAvatar {
@@ -147,6 +144,4 @@ impl Avatar for ClientAvatar {
     fn head_rotation(&self) -> &Quaternion<f32> {
         &self.head_rotation
     }
-
 }
-

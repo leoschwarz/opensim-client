@@ -1,7 +1,7 @@
 //! This module contains the types which represent the data that represents the
 //! state of the simulator and is to be rendered on the screen.
 
-pub use nalgebra::{Matrix4, MatrixN, DMatrix, Quaternion, UnitQuaternion, Vector2, Vector3};
+pub use nalgebra::{DMatrix, Matrix4, MatrixN, Quaternion, UnitQuaternion, Vector2, Vector3};
 pub use opensim_networking::types::Uuid;
 use typenum;
 
@@ -29,11 +29,10 @@ pub mod entities;
 //     +---+---+---+---+
 //   - Map these values to actual regions in a many-to-one fashion.
 //   - Load the regions in direct proximity of the viewer.
-// - This should probably be implemented with an inner struct which can be updated
-//   by the networking thread and use a mutex inside.
+// - This should probably be implemented with an inner struct which can be
+// updated   by the networking thread and use a mutex inside.
 //   (I would prefer RwLock but writer starvation is a big problem for us.)
-pub struct World {
-}
+pub struct World {}
 
 pub struct Region {
     /// Side length of the region in meters.
@@ -55,13 +54,10 @@ impl Region {
 //   - Make TerrainPatch serializable and implement a disk caching strategy,
 //     where patches around the player are kept in memory.
 //   - For now store everything in RAM.
-pub struct Terrain
-{
-}
+pub struct Terrain {}
 
 impl Terrain {
-    pub fn get_patch(&mut self, pos: Vector2<u8>) -> Result<TerrainPatch, ()>
-    {
+    pub fn get_patch(&mut self, pos: Vector2<u8>) -> Result<TerrainPatch, ()> {
         unimplemented!()
     }
 }
@@ -90,7 +86,8 @@ pub type PatchMatrix<S> = MatrixN<S, typenum::U256>;
 pub mod locators {
     use super::*;
 
-    /// Universal Region Locator, points to a specific region on a specific grid.
+    /// Universal Region Locator, points to a specific region on a specific
+    /// grid.
     #[derive(Clone, Debug)]
     pub struct RegionLocator {
         // TODO: This should probably be an URI
@@ -112,7 +109,8 @@ pub mod locators {
         pub patch_pos: Vector2<u8>,
     }
 
-    /// Universal Point Locator, points to a specific point in a specific region on
+    /// Universal Point Locator, points to a specific point in a specific
+    /// region on
     /// a specific grid.
     // TODO
     // Maybe this should be made into trait so it can be used efficiently without allocating

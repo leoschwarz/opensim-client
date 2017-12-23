@@ -4,7 +4,7 @@
 
 use data;
 use data::avatar::ClientAvatar;
-use glium::{glutin, Surface, self};
+use glium::{self, glutin, Surface};
 use glium::index::PrimitiveType;
 use nalgebra::Vector3;
 use std::time::{Duration, Instant};
@@ -173,5 +173,4 @@ pub fn render_world() {
 
         thread::sleep(fixed_time_step - accumulator);
     }
-
 }
