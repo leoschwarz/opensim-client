@@ -9,6 +9,7 @@
 
 use {data, std};
 use futures::{self, Future, Sink, Stream};
+use futures::sync::mpsc;
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::{ConnectInfo, MessageHandlers, Simulator};
 use std::collections::HashMap;
@@ -20,13 +21,13 @@ use self::region_connection::{RegionConnection, RegionConnectionInternal};
 
 pub struct Networking {
     thread_handle: JoinHandle<()>,
-    connect_tx: futures::sync::mpsc::Sender<(RegionConnectionInternal, ConnectInfo)>,
+    connect_tx: mpsc::Sender<(RegionConnectionInternal, ConnectInfo)>,
     log: Log,
 }
 
 impl Networking {
     pub fn new(log: Log) -> Self {
-        let (connect_tx, connect_rx) = futures::sync::mpsc::channel(1);
+        let (connect_tx, connect_rx) = mpsc::channel(1);
         let thread_handle = thread::spawn(move || {
             // let mut connections = HashMap::new();
 

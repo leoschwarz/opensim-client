@@ -6,12 +6,12 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
 extern crate alga;
-extern crate crossbeam_channel;
 extern crate futures;
 #[macro_use]
 extern crate glium;
 #[macro_use]
 extern crate lazy_static;
+extern crate multiqueue;
 extern crate nalgebra;
 extern crate opensim_networking;
 #[macro_use]
