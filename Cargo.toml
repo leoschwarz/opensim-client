@@ -9,7 +9,9 @@ alga = "0.5.2"
 futures = "0.1.17"
 glium = "0.19.0"
 lazy_static = "1.0.0"
-multiqueue = "0.3.2"
+#multiqueue = "0.3.2"
+# use git version until https://github.com/leoschwarz/multiqueue/commit/998c381b05e287cd238cd0dccbcb7771c1442328 lands in crates.io version.
+multiqueue = { git = "https://github.com/leoschwarz/multiqueue" }
 nalgebra = "0.13.1"
 opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
 serde = "1.0"
