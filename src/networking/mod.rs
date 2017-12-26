@@ -8,17 +8,18 @@
 // TODO
 
 use {data, std};
-use futures::{self, Future, Sink, Stream};
+use chashmap::CHashMap;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::sync::mpsc;
+use futures::{self, Future, Sink, Stream};
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::{ConnectInfo, MessageHandlers, Simulator};
-use std::collections::HashMap;
-use std::thread::{self, JoinHandle};
+use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::mpsc::SendError;
-use std::hash::{Hash, Hasher};
+use std::thread::{self, JoinHandle};
 use tokio_core::reactor::{Core, Handle};
 
 pub mod region_connection;
@@ -65,22 +66,17 @@ pub struct Networking {
     setup_conn: mpsc::Sender<(RegionConnectionInternal, RegionId)>,
 }
 
-fn setup_connection(conns: &mut HashMap<RegionId, Connection>,
-                    connect_info: ConnectInfo,
-                    core_handle: Handle,
-                    log: Log,
-                    region_id: RegionId,
-                    conn_internal: RegionConnectionInternal) 
-    -> Box<Future<Item=(), Error=SendError<EventRecv>>> {
-    let fut = async_block! {
-        let sim_result = await!(Simulator::connect(
-                connect_info,
-                MessageHandlers::default(),
-                core_handle,
-                log
-                ));
-
-        let send = if let Ok(sim) = sim_result {
+fn setup_connection(
+    conns: Rc<CHashMap<RegionId, Connection>>,
+    connect_info: ConnectInfo,
+    core_handle: Handle,
+    log: Log,
+    region_id: RegionId,
+    conn_internal: RegionConnectionInternal,
+) -> impl Future<Item = (), Error = SendError<EventRecv>> {
+    let sim_future = Simulator::connect(connect_info, MessageHandlers::default(), core_handle, log);
+    let send_future = sim_future.then(move |sim_result| {
+        if let Ok(sim) = sim_result {
             conns.insert(
                 region_id,
                 Connection {
@@ -91,10 +87,9 @@ fn setup_connection(conns: &mut HashMap<RegionId, Connection>,
             conn_internal.send.send(EventRecv::ConnectResult(Ok(())))
         } else {
             conn_internal.send.send(EventRecv::ConnectResult(Err(())))
-        };
-        await!(send).map(|_| ())
-    };
-    Box::new(fut)
+        }
+    });
+    send_future.map(|_| ())
 }
 
 impl Networking {
@@ -104,7 +99,7 @@ impl Networking {
 
         let thread_handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let mut conns: HashMap<RegionId, Connection> = HashMap::new();
+            let conns: Rc<CHashMap<RegionId, Connection>> = Rc::new(CHashMap::new());
 
             let core_handle = core.handle();
             let setup_conn_handler = setup_conn_rx.map_err(|_| "MPMC recv error");
@@ -115,12 +110,14 @@ impl Networking {
                     RegionId,
                 ) = tuple;
 
-                let send =async_block!{ await!(setup_connection(&mut conns,
-                                                   (*region_id.connect_info).clone(),
-                                                   core_handle.clone(),
-                                                   log_copy.clone(),
-                                                   region_id,
-                                                   conn_internal.clone()))};
+                let send = setup_connection(
+                    Rc::clone(&conns),
+                    (*region_id.connect_info).clone(),
+                    core_handle.clone(),
+                    log_copy.clone(),
+                    region_id,
+                    conn_internal.clone(),
+                );
                 send.map_err(|_| "MPMC send error.")
             });
 

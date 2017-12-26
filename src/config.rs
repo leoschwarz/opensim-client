@@ -28,9 +28,8 @@ pub struct ConfigSim {
 }
 
 pub fn get_config<P: AsRef<Path>>(path: P) -> Result<Config, String> {
-    let mut file = File::open(path.as_ref()).map_err(|_| {
-        format!("Failed reading config file {:?}", path.as_ref())
-    })?;
+    let mut file = File::open(path.as_ref())
+        .map_err(|_| format!("Failed reading config file {:?}", path.as_ref()))?;
     let mut raw_data = String::new();
     file.read_to_string(&mut raw_data).unwrap();
     toml::from_str(raw_data.as_str()).map_err(|e| format!("Invalid TOML: {}", e))

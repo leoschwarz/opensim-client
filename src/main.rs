@@ -7,6 +7,7 @@
 #![feature(proc_macro, conservative_impl_trait, generators)]
 
 extern crate alga;
+extern crate chashmap;
 #[macro_use]
 extern crate futures_await as futures;
 #[macro_use]
@@ -43,7 +44,6 @@ fn main() {
         .expect("Login failure.");
 
     // Connect to the simulator.
-
 
     render::render_world();
 }
