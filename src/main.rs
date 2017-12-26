@@ -4,9 +4,11 @@
 
 // TODO: Remove at some later time.
 #![allow(dead_code, unused_imports, unused_variables)]
+#![feature(proc_macro, conservative_impl_trait, generators)]
 
 extern crate alga;
-extern crate futures;
+#[macro_use]
+extern crate futures_await as futures;
 #[macro_use]
 extern crate glium;
 #[macro_use]

@@ -9,6 +9,7 @@
 
 use {data, std};
 use futures::{self, Future, Sink, Stream};
+use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::sync::mpsc;
 use opensim_networking::logging::Log;
@@ -16,8 +17,9 @@ use opensim_networking::simulator::{ConnectInfo, MessageHandlers, Simulator};
 use std::collections::HashMap;
 use std::thread::{self, JoinHandle};
 use std::sync::Arc;
+use std::sync::mpsc::SendError;
 use std::hash::{Hash, Hasher};
-use tokio_core::reactor::Core;
+use tokio_core::reactor::{Core, Handle};
 
 pub mod region_connection;
 use self::region_connection::{EventRecv, RegionConnection, RegionConnectionInternal};
@@ -63,6 +65,38 @@ pub struct Networking {
     setup_conn: mpsc::Sender<(RegionConnectionInternal, RegionId)>,
 }
 
+fn setup_connection(conns: &mut HashMap<RegionId, Connection>,
+                    connect_info: ConnectInfo,
+                    core_handle: Handle,
+                    log: Log,
+                    region_id: RegionId,
+                    conn_internal: RegionConnectionInternal) 
+    -> Box<Future<Item=(), Error=SendError<EventRecv>>> {
+    let fut = async_block! {
+        let sim_result = await!(Simulator::connect(
+                connect_info,
+                MessageHandlers::default(),
+                core_handle,
+                log
+                ));
+
+        let send = if let Ok(sim) = sim_result {
+            conns.insert(
+                region_id,
+                Connection {
+                    comm: conn_internal.clone(),
+                    sim: sim,
+                },
+            );
+            conn_internal.send.send(EventRecv::ConnectResult(Ok(())))
+        } else {
+            conn_internal.send.send(EventRecv::ConnectResult(Err(())))
+        };
+        await!(send).map(|_| ())
+    };
+    Box::new(fut)
+}
+
 impl Networking {
     pub fn new(log: Log) -> Self {
         let (setup_conn_tx, setup_conn_rx) = mpsc::channel(1);
@@ -72,9 +106,8 @@ impl Networking {
             let mut core = Core::new().unwrap();
             let mut conns: HashMap<RegionId, Connection> = HashMap::new();
 
-            // TODO: probably need to use and_then and map_err here in the future.
-            let handle = core.handle();
-            let setup_conn_handler = setup_conn_rx.map_err(|_| "");
+            let core_handle = core.handle();
+            let setup_conn_handler = setup_conn_rx.map_err(|_| "MPMC recv error");
             let setup_conn_handler = setup_conn_handler.and_then(|tuple| {
                 // TODO: Why are type annotations required here?
                 let (conn_internal, region_id): (
@@ -82,31 +115,12 @@ impl Networking {
                     RegionId,
                 ) = tuple;
 
-                // TODO: This is blocking currently.
-                let sim_result = Simulator::connect(
-                    region_id.connect_info.as_ref(),
-                    MessageHandlers::default(),
-                    handle.clone(),
-                    &log_copy,
-                );
-                let send = if let Ok(sim) = sim_result {
-                    conns.insert(
-                        region_id,
-                        Connection {
-                            comm: conn_internal.clone(),
-                            sim: sim,
-                        },
-                    );
-                    conn_internal
-                        .send
-                        .clone()
-                        .send(EventRecv::ConnectResult(Ok(())))
-                } else {
-                    conn_internal
-                        .send
-                        .clone()
-                        .send(EventRecv::ConnectResult(Err(())))
-                };
+                let send =async_block!{ await!(setup_connection(&mut conns,
+                                                   (*region_id.connect_info).clone(),
+                                                   core_handle.clone(),
+                                                   log_copy.clone(),
+                                                   region_id,
+                                                   conn_internal.clone()))};
                 send.map_err(|_| "MPMC send error.")
             });
 
