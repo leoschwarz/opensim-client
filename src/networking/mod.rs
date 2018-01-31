@@ -15,6 +15,7 @@ use futures::sync::mpsc;
 use futures::{self, Future, Sink, Stream};
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::{ConnectInfo, MessageHandlers, Simulator};
+use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -73,18 +74,19 @@ fn setup_connection(
     log: Log,
     region_id: RegionId,
     conn_internal: RegionConnectionInternal,
-) -> impl Future<Item = (), Error = SendError<EventRecv>> {
+) -> impl Future<Item = (), Error = mpsc::SendError<EventRecv>> {
     let sim_future = Simulator::connect(connect_info, MessageHandlers::default(), core_handle, log);
     let send_future = sim_future.then(move |sim_result| {
         if let Ok(sim) = sim_result {
+            let send = conn_internal.send.clone();
             conns.insert(
                 region_id,
                 Connection {
-                    comm: conn_internal.clone(),
+                    comm: conn_internal,
                     sim: sim,
                 },
             );
-            conn_internal.send.send(EventRecv::ConnectResult(Ok(())))
+            send.send(EventRecv::ConnectResult(Ok(())))
         } else {
             conn_internal.send.send(EventRecv::ConnectResult(Err(())))
         }
@@ -116,7 +118,7 @@ impl Networking {
                     core_handle.clone(),
                     log_copy.clone(),
                     region_id,
-                    conn_internal.clone(),
+                    conn_internal,
                 );
                 send.map_err(|_| "MPMC send error.")
             });
@@ -131,14 +133,57 @@ impl Networking {
         }
     }
 
-    pub fn connect_region(&self, region_id: RegionId) -> RegionConnection {
+    //    #[async]
+    pub fn connect_region(
+        self: Box<Self>,
+        region_id: RegionId,
+    ) -> impl Future<Item = RegionConnection, Error = ConnectError>
+//Result<RegionConnection, ConnectError>
+    {
         let (conn, conn_internal) = region_connection::new_pair();
-        // TODO: Consider whether we really want to unwrap here?
-        self.setup_conn
+        //let conn = Rc::new(RefCell::new(conn));
+
+        let send_setup = self.setup_conn
             .clone()
             .send((conn_internal, region_id))
-            .wait()
-            .unwrap();
-        conn
+            .map_err(|_| ConnectError::SendError);
+
+        send_setup.and_then(move |_| {
+            conn.recv()
+                .map_err(|_| ConnectError::RecvError)
+                .map(|_| conn)
+        })
+
+        //handshake.map(move |_| conn)
+        //await!(self.connect_region_internal(region_id))
+        //    .map(|c| c.into_inner())
+
+        /*
+        let conn2 = Rc::clone(&conn);
+        let handshake = await!(RegionConnection::recv(conn2.borrow_mut())).map_err(|_| ConnectError::RecvError)?;
+        */
+        /*
+        let conn2 = Rc::clone(&conn);
+        let handshake = async_block! {
+            let recv = conn2.borrow_mut().recv();
+            await!(recv).map_err(|_| ConnectError::RecvError)
+        };
+        //let handshake = await!(conn.borrow_mut().recv()).map_err(|_| ConnectError::RecvError)?;
+        */
+
+        //Rc::try_unwrap(conn).map(RefCell::into_inner).map_err(|_| unreachable!())
+        //conn.map(|c| c.into_inner()).map_err(|_| unreachable!())
+        //
+    }
+}
+
+pub enum ConnectError {
+    SendError,
+    RecvError,
+}
+
+impl<T> From<mpsc::SendError<T>> for ConnectError {
+    fn from(_: mpsc::SendError<T>) -> Self {
+        ConnectError::SendError
     }
 }
