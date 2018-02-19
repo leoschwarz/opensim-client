@@ -1,23 +1,27 @@
+//! RegionConnection exposes actions to be performed through the networking thread,
+//! for communication with specific simulators.
+
 use data::TerrainPatch;
 use futures::{Async, Future, Poll, Sink, Stream};
 use futures::sync::mpsc;
-//use multiqueue::{self, mpsc::Receiver, mpsc::Sender};
 use std::sync::mpsc::{RecvError, SendError};
 
-/// Managing the connection in the client code.
+/// The main handle to perform communication with a region, on the networking thread
+/// managed by the Networking struct.
 pub struct RegionConnection {
     recv: mpsc::Receiver<EventRecv>,
     send: mpsc::Sender<EventSend>,
 }
 
-/// The internal manager of the connection in the networking code (in the
-/// networking thread).
-pub struct RegionConnectionInternal {
+/// Internal counterpart of `RegionConnection`, this is what the networking thread
+/// uses to communicate with the rest of the client code.
+pub(super) struct RegionConnectionInternal {
     pub recv: mpsc::Receiver<EventSend>,
     pub send: mpsc::Sender<EventRecv>,
 }
 
-pub fn new_pair() -> (RegionConnection, RegionConnectionInternal) {
+/// Creates a new
+pub(super) fn new_pair() -> (RegionConnection, RegionConnectionInternal) {
     let max_buffer = 256;
     let (send1, recv1) = mpsc::channel(max_buffer);
     let (send2, recv2) = mpsc::channel(max_buffer);
@@ -32,6 +36,20 @@ pub fn new_pair() -> (RegionConnection, RegionConnectionInternal) {
     (conn1, conn2)
 }
 
+/// The events that can be sent out from the viewer to the region.
+pub(super) enum EventSend {
+
+}
+
+/// The events that can be received from the region by the viewer.
+pub(super) enum EventRecv {
+    TerrainPatch(TerrainPatch)
+    // ConnectResult(Result<(), ()>),
+}
+
+
+
+/*
 pub struct Recv<'a> {
     recv: &'a mut mpsc::Receiver<EventRecv>,
 }
@@ -50,6 +68,7 @@ impl<'a> Future for Recv<'a> {
     }
 }
 
+TODO
 impl RegionConnection {
     pub fn send(&self, event: EventSend) -> Result<(), mpsc::SendError<EventSend>> {
         self.send.clone().send(event).map(|_| ()).wait()
@@ -61,10 +80,4 @@ impl RegionConnection {
         }
     }
 }
-
-pub enum EventRecv {
-    TerrainPatch(TerrainPatch),
-    ConnectResult(Result<(), ()>),
-}
-
-pub enum EventSend {}
+*/

@@ -19,7 +19,7 @@ extern crate nalgebra;
 extern crate opensim_networking;
 #[macro_use]
 extern crate serde_derive;
-extern crate tokio_core;
+extern crate tokio;
 extern crate toml;
 extern crate typenum;
 

@@ -21,10 +21,91 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::mpsc::SendError;
 use std::thread::{self, JoinHandle};
-use tokio_core::reactor::{Core, Handle};
+use tokio::reactor::{Reactor, Handle};
 
 pub mod region_connection;
+pub use self::region_connection::RegionConnection;
+use self::region_connection::RegionConnectionInternal;
+
+/// Main manager of networking resources in the client.
+///
+/// There should be only one instance of this struct held by the viewer,
+/// it exposes an interface for establishing new connections to different simulators.
+/// These connections can then be used to communicate with the relevant simulators.
+pub struct Networking {
+    /// The thread where the networking code runs.
+    net_thread: JoinHandle<()>,
+
+    /// Log instance to write to.
+    /// TODO: Remove if not needed.
+    log: Log,
+
+    /// Used to register a RegionConnection in the networking thread.
+    setup_conn: mpsc::Sender<(RegionConnectionInternal, RegionId)>,
+}
+
+impl Networking {
+    pub fn new(log: Log) -> Self {
+        let (setup_conn_tx, setup_conn_rx) = mpsc::channel(1);
+        let thread_handle = thread::spawn(move || {
+            let mut reactor = Reactor::new().unwrap();
+            let conns: CHashMap<RegionId, RegionConnectionInternal> = CHashMap::new();
+
+            let do_setup_conn =
+                setup_conn_rx.map(|conn_int| {
+
+                });
+
+        });
+
+        Networking {
+            net_thread: thread_handle,
+            log: log,
+            setup_conn: setup_conn_tx,
+        }
+
+        /*
+        let thread_handle = thread::spawn(move || {
+            let conns: Rc<CHashMap<RegionId, Connection>> = Rc::new(CHashMap::new());
+
+            let core_handle = core.handle();
+            let setup_conn_handler = setup_conn_rx.map_err(|_| "MPMC recv error");
+            let setup_conn_handler = setup_conn_handler.and_then(|tuple| {
+                // TODO: Why are type annotations required here?
+                let (conn_internal, region_id): (
+                    RegionConnectionInternal,
+                    RegionId,
+                ) = tuple;
+
+                let send = setup_connection(
+                    Rc::clone(&conns),
+                    (*region_id.connect_info).clone(),
+                    core_handle.clone(),
+                    log_copy.clone(),
+                    region_id,
+                    conn_internal,
+                );
+                send.map_err(|_| "MPMC send error.")
+            });
+
+            core.run(setup_conn_handler.into_future());
+        });
+        */
+    }
+
+    #[async]
+    pub fn connect_region(&self) -> Result<RegionConnection, ()> {
+        let (conn, conn_int) = region_connection::new_pair();
+        await!(self.setup_conn.clone().send(conn_int));
+        // TODO: make sure the connection is actually established.
+        Ok(conn)
+    }
+}
+
+/*
+pub mod region_connection;
 use self::region_connection::{EventRecv, RegionConnection, RegionConnectionInternal};
+
 
 #[derive(Clone, Debug)]
 pub struct RegionId {
@@ -50,6 +131,7 @@ impl PartialEq for RegionId {
 
 impl Eq for RegionId {}
 
+/// Connection remote to a simulator.
 struct Connection {
     /// The communicator.
     comm: RegionConnectionInternal,
@@ -58,14 +140,7 @@ struct Connection {
     sim: Simulator,
 }
 
-pub struct Networking {
-    /// The thread where the networking code runs.
-    net_thread: JoinHandle<()>,
-    log: Log,
 
-    /// Used to register a RegionConnection in the networking thread.
-    setup_conn: mpsc::Sender<(RegionConnectionInternal, RegionId)>,
-}
 
 fn setup_connection(
     conns: Rc<CHashMap<RegionId, Connection>>,
@@ -95,43 +170,7 @@ fn setup_connection(
 }
 
 impl Networking {
-    pub fn new(log: Log) -> Self {
-        let (setup_conn_tx, setup_conn_rx) = mpsc::channel(1);
-        let log_copy = log.clone();
 
-        let thread_handle = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
-            let conns: Rc<CHashMap<RegionId, Connection>> = Rc::new(CHashMap::new());
-
-            let core_handle = core.handle();
-            let setup_conn_handler = setup_conn_rx.map_err(|_| "MPMC recv error");
-            let setup_conn_handler = setup_conn_handler.and_then(|tuple| {
-                // TODO: Why are type annotations required here?
-                let (conn_internal, region_id): (
-                    RegionConnectionInternal,
-                    RegionId,
-                ) = tuple;
-
-                let send = setup_connection(
-                    Rc::clone(&conns),
-                    (*region_id.connect_info).clone(),
-                    core_handle.clone(),
-                    log_copy.clone(),
-                    region_id,
-                    conn_internal,
-                );
-                send.map_err(|_| "MPMC send error.")
-            });
-
-            core.run(setup_conn_handler.into_future());
-        });
-
-        Networking {
-            net_thread: thread_handle,
-            log: log,
-            setup_conn: setup_conn_tx,
-        }
-    }
 
     //    #[async]
     pub fn connect_region(
@@ -187,3 +226,4 @@ impl<T> From<mpsc::SendError<T>> for ConnectError {
         ConnectError::SendError
     }
 }
+*/
