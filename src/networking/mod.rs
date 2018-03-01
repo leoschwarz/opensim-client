@@ -5,7 +5,9 @@
 //! updating it dynamically, which will then be rendered by different
 //! components of the viewer.
 
-// TODO
+// TODO: Actually we probably don't need the connection communicators.
+// What we really need is someone who manages our instance of world data, provides ways to request
+// more when needed, and caches it away to save memory.
 
 use {data, std};
 use chashmap::CHashMap;
@@ -21,11 +23,14 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::mpsc::SendError;
 use std::thread::{self, JoinHandle};
-use tokio::reactor::{Reactor, Handle};
+use tokio::reactor::{Handle, Reactor};
+use uuid::Uuid;
 
 pub mod region_connection;
 pub use self::region_connection::RegionConnection;
 use self::region_connection::RegionConnectionInternal;
+
+type RegionId = Uuid;
 
 /// Main manager of networking resources in the client.
 ///
@@ -48,14 +53,20 @@ impl Networking {
     pub fn new(log: Log) -> Self {
         let (setup_conn_tx, setup_conn_rx) = mpsc::channel(1);
         let thread_handle = thread::spawn(move || {
+            use tokio::executor::current_thread;
+
             let mut reactor = Reactor::new().unwrap();
-            let conns: CHashMap<RegionId, RegionConnectionInternal> = CHashMap::new();
+            let conns: Arc<CHashMap<RegionId, RegionConnectionInternal>> =
+                Arc::new(CHashMap::new());
 
-            let do_setup_conn =
-                setup_conn_rx.map(|conn_int| {
+            let do_setup_conn = setup_conn_rx.map(move |(conn_int, region_id)| {
+                conns.insert(region_id, conn_int);
+            });
+            let fut = do_setup_conn.into_future().map(|_| ()).map_err(|_| ());
 
-                });
-
+            current_thread::run(|_| {
+                current_thread::spawn(fut);
+            });
         });
 
         Networking {
@@ -63,49 +74,25 @@ impl Networking {
             log: log,
             setup_conn: setup_conn_tx,
         }
-
-        /*
-        let thread_handle = thread::spawn(move || {
-            let conns: Rc<CHashMap<RegionId, Connection>> = Rc::new(CHashMap::new());
-
-            let core_handle = core.handle();
-            let setup_conn_handler = setup_conn_rx.map_err(|_| "MPMC recv error");
-            let setup_conn_handler = setup_conn_handler.and_then(|tuple| {
-                // TODO: Why are type annotations required here?
-                let (conn_internal, region_id): (
-                    RegionConnectionInternal,
-                    RegionId,
-                ) = tuple;
-
-                let send = setup_connection(
-                    Rc::clone(&conns),
-                    (*region_id.connect_info).clone(),
-                    core_handle.clone(),
-                    log_copy.clone(),
-                    region_id,
-                    conn_internal,
-                );
-                send.map_err(|_| "MPMC send error.")
-            });
-
-            core.run(setup_conn_handler.into_future());
-        });
-        */
     }
 
-    #[async]
-    pub fn connect_region(&self) -> Result<RegionConnection, ()> {
-        let (conn, conn_int) = region_connection::new_pair();
-        await!(self.setup_conn.clone().send(conn_int));
-        // TODO: make sure the connection is actually established.
-        Ok(conn)
+    pub fn connect_region(
+        &self,
+        region_id: RegionId,
+    ) -> impl Future<Item = RegionConnection, Error = ()> {
+        let setup_conn = self.setup_conn.clone();
+        async_block! {
+            let (conn, conn_int) = region_connection::new_pair();
+            await!(setup_conn.send((conn_int, region_id)));
+            // TODO: make sure the connection is actually established.
+            Ok(conn)
+        }
     }
 }
 
 /*
 pub mod region_connection;
 use self::region_connection::{EventRecv, RegionConnection, RegionConnectionInternal};
-
 
 #[derive(Clone, Debug)]
 pub struct RegionId {

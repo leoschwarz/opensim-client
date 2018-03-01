@@ -1,5 +1,5 @@
-//! RegionConnection exposes actions to be performed through the networking thread,
-//! for communication with specific simulators.
+//! RegionConnection exposes actions to be performed through the networking
+//! thread, for communication with specific simulators.
 
 use data::TerrainPatch;
 use futures::{Async, Future, Poll, Sink, Stream};
@@ -43,11 +43,8 @@ pub(super) enum EventSend {
 
 /// The events that can be received from the region by the viewer.
 pub(super) enum EventRecv {
-    TerrainPatch(TerrainPatch)
-    // ConnectResult(Result<(), ()>),
+    TerrainPatch(TerrainPatch), // ConnectResult(Result<(), ()>)
 }
-
-
 
 /*
 pub struct Recv<'a> {

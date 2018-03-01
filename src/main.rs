@@ -22,6 +22,7 @@ extern crate serde_derive;
 extern crate tokio;
 extern crate toml;
 extern crate typenum;
+extern crate uuid;
 
 pub mod config;
 pub mod data;

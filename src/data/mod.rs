@@ -37,6 +37,12 @@ pub struct World {}
 pub struct Region {
     /// Side length of the region in meters.
     size: u32,
+
+    /// The unique ID of the region.
+    id: Uuid,
+
+    /// The location of the region on the grid.
+    grid_location: Vector2<u32>,
 }
 
 impl Region {
