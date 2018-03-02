@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 #[derive(Clone, Debug)]
 pub struct CacheConfig {
     /// Maximum size of the cache in bytes.
-    max_bytes: u64,
+    pub max_bytes: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -50,6 +50,10 @@ where
     I: DeserializeOwned + Serialize + Clone + Eq + Hash,
 {
     pub fn initialize(data_dir: PathBuf, config: CacheConfig) -> Result<Self, CacheError> {
+        if !data_dir.exists() {
+            fs::create_dir(&data_dir).map_err(|e| CacheError::CreateDir(e))?;
+        }
+
         let data_file = data_dir.join("cache_data.json");
         let data = if data_file.exists() {
             let file = File::open(data_file).map_err(|e| CacheError::ReadDataFile(e))?;
@@ -132,12 +136,14 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum CacheError {
     ReadDataFile(io::Error),
     ParseDataFile(serde_json::Error),
     ReadCacheFile(io::Error),
     ParseCacheFile(serde_json::Error),
     EncodeCacheFile(serde_json::Error),
+    CreateDir(io::Error),
     CreateFile(io::Error),
     WriteFile(io::Error),
     RemoveFile(io::Error),

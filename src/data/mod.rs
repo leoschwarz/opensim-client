@@ -72,6 +72,7 @@ impl Terrain {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct TerrainPatch {
     pub position: Vector2<u8>,
     pub region: Uuid,
