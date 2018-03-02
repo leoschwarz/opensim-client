@@ -5,6 +5,7 @@ authors = ["Leo Schwarz <mail@leoschwarz.com>"]
 
 [dependencies]
 #imgui = "0.0.17"
+addressable_queue = "0.2.0"
 alga = "0.5.2"
 chashmap = "2.2"
 futures = "0.1.17"
@@ -16,8 +17,10 @@ lazy_static = "1.0.0"
 multiqueue = { git = "https://github.com/leoschwarz/multiqueue" }
 nalgebra = "0.13.1"
 opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
+rmp-serde = "0.13.7"
 serde = "1.0"
 serde_derive = "1.0"
+serde_json = "1.0"
 tokio = "0.1.1"
 toml = "0.4.5"
 typenum = "1.9"

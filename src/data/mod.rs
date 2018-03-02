@@ -73,7 +73,9 @@ impl Terrain {
 }
 
 pub struct TerrainPatch {
-    land_heightmap: PatchMatrix<f32>,
+    pub position: Vector2<u8>,
+    pub region: Uuid,
+    pub land_heightmap: PatchMatrix<f32>,
 }
 
 impl TerrainPatch {
@@ -85,6 +87,8 @@ impl TerrainPatch {
     pub fn dummy() -> Self {
         let raw_data = include!("./layer_land.png.txt");
         TerrainPatch {
+            position: Vector2::new(0, 0),
+            region: Uuid::nil(),
             land_heightmap: PatchMatrix::from_fn(|x, y| raw_data[x][y]),
         }
     }

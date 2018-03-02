@@ -6,6 +6,7 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 #![feature(proc_macro, conservative_impl_trait, generators)]
 
+extern crate addressable_queue;
 extern crate alga;
 extern crate chashmap;
 #[macro_use]
@@ -17,13 +18,16 @@ extern crate lazy_static;
 extern crate multiqueue;
 extern crate nalgebra;
 extern crate opensim_networking;
+extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
 extern crate tokio;
 extern crate toml;
 extern crate typenum;
 extern crate uuid;
 
+pub mod cache;
 pub mod config;
 pub mod data;
 pub mod networking;
