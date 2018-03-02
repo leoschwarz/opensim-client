@@ -23,6 +23,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate tokio;
+extern crate tokio_core;
 extern crate toml;
 extern crate typenum;
 extern crate uuid;
@@ -34,7 +35,15 @@ pub mod networking;
 pub mod render;
 
 fn main() {
+    use futures::Future;
+    use opensim_networking::logging::{Log, LogLevel};
     use opensim_networking::login::{hash_password, LoginRequest};
+    use opensim_networking::simulator::Simulator;
+    use opensim_networking::circuit::message_handlers::Handlers;
+    use networking::RegionManager;
+    use tokio_core::reactor::Core;
+    use std::thread;
+    use std::sync::{Arc, Mutex};
 
     // Perform the login.
     let cfg = config::get_config("remote_sim.toml").expect("no config");
@@ -48,7 +57,27 @@ fn main() {
         .perform(cfg.sim.loginuri.as_str())
         .expect("Login failure.");
 
+    // Setup logging.
+    let log = Log::new_dir("target/log", LogLevel::Debug).unwrap();
+    let connect_info = login_response.into();
+    let handlers = Handlers::default();
+
     // Connect to the simulator.
+
+    thread::spawn(move || {
+        let mut region_manager = RegionManager::start();
+        let mut reactor = Core::new().unwrap();
+        let handle = reactor.handle();
+
+        let sim = Simulator::connect(connect_info, handlers, handle, log)
+            .wait()
+            .unwrap();
+        region_manager.setup_sim(sim);
+
+        loop {
+            reactor.turn(None);
+        }
+    });
 
     render::render_world();
 }

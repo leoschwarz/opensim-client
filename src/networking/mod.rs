@@ -26,7 +26,7 @@ pub struct RegionManager {
 }
 
 impl RegionManager {
-    fn start() -> Self {
+    pub fn start() -> Self {
         // TODO: Remove the expect.
         let terrain_manager = TerrainManager::start().expect("Setting up terrain_manager failed.");
 
@@ -36,7 +36,7 @@ impl RegionManager {
         }
     }
 
-    fn setup_sim(&mut self, sim: Simulator) {
+    pub fn setup_sim(&mut self, sim: Simulator) {
         let region_id = sim.region_info().region_id.clone();
         let terrain_receivers = sim.services().terrain.receivers().unwrap();
         self.simulators.insert(region_id, sim);
