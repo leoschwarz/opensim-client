@@ -51,7 +51,7 @@ where
 {
     pub fn initialize(data_dir: PathBuf, config: CacheConfig) -> Result<Self, CacheError> {
         if !data_dir.exists() {
-            fs::create_dir(&data_dir).map_err(|e| CacheError::CreateDir(e))?;
+            fs::create_dir_all(&data_dir).map_err(|e| CacheError::CreateDir(e))?;
         }
 
         let data_file = data_dir.join("cache_data.json");

@@ -10,28 +10,32 @@ use chashmap::CHashMap;
 use data::TerrainPatch;
 use futures::{future, Async, Future, Poll};
 use nalgebra::Vector2;
+use opensim_networking::logging::Log;
 use opensim_networking::simulator::Simulator;
 use opensim_networking::services::terrain;
 use std::collections::HashMap;
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex};
 use std::path::PathBuf;
+use slog::{Drain, Logger};
 use uuid::Uuid;
 
 /// Manages the interaction between Viewer and Region.
 pub struct RegionManager {
     simulators: HashMap<Uuid, Simulator>,
+    log: Log,
 
-    terrain_manager: TerrainManager,
+    pub terrain_manager: TerrainManager,
 }
 
 impl RegionManager {
-    pub fn start() -> Self {
+    pub fn start(log: Log) -> Self {
         // TODO: Remove the expect.
-        let terrain_manager = TerrainManager::start().expect("Setting up terrain_manager failed.");
+        let terrain_manager = TerrainManager::start(log.clone()).expect("Setting up terrain_manager failed.");
 
         RegionManager {
             simulators: HashMap::new(),
+            log,
             terrain_manager,
         }
     }
@@ -39,6 +43,10 @@ impl RegionManager {
     pub fn setup_sim(&mut self, sim: Simulator) {
         let region_id = sim.region_info().region_id.clone();
         let terrain_receivers = sim.services().terrain.receivers().unwrap();
+
+        let mut all_receivers = self.terrain_manager.inner.receivers.lock().unwrap();
+        all_receivers.push((region_id.clone(), terrain_receivers));
+
         self.simulators.insert(region_id, sim);
     }
 }
@@ -46,6 +54,7 @@ impl RegionManager {
 type PatchHandle = (Uuid, Vector2<u8>);
 
 struct TerrainManagerInner {
+    logger: Logger,
     cache: Mutex<TerrainCache>,
     receivers: Mutex<Vec<(Uuid, terrain::Receivers)>>,
 }
@@ -60,17 +69,21 @@ impl TerrainManagerInner {
     // up  using outdated cache data.)
     /// Extracts all available messages from the receiver queues.
     fn extract_queues(&self) -> Result<(), CacheError> {
+        debug!(self.logger, "TerrainManager::extract_queues invoked.");
         let receivers = self.receivers.lock().unwrap();
         for &(ref region_id, ref receiver) in receivers.iter() {
             loop {
+                debug!(self.logger, "TerrainManager::extract_queues loop");
                 match receiver.land_patches.try_recv() {
                     Ok(patches) => {
+                        debug!(self.logger, "TerrainManager::extract_queues received patches");
                         let mut cache = self.cache.lock().unwrap();
                         for patch in &patches {
                             let pos = patch.patch_position();
                             let pos = Vector2::new(pos.0 as u8, pos.1 as u8);
 
                             let patch_handle = (region_id.clone(), pos);
+                            debug!(self.logger, "Received terrain patch for: {:?}", patch_handle);
                             cache.put(
                                 &patch_handle,
                                 &TerrainPatch {
@@ -80,12 +93,15 @@ impl TerrainManagerInner {
                                     land_heightmap: patch.data().clone().fixed_resize(-1.),
                                 },
                             )?;
+                            debug!(self.logger, "Cached terrain patch for: {:?}", patch_handle);
                         }
                     }
                     Err(mpsc::TryRecvError::Empty) => {
+                        debug!(self.logger, "Channel empty.");
                         break;
                     }
                     Err(mpsc::TryRecvError::Disconnected) => {
+                        debug!(self.logger, "Channel disconnected.");
                         // TODO: Delete the receiver.
                         break;
                     }
@@ -96,12 +112,13 @@ impl TerrainManagerInner {
     }
 }
 
+#[derive(Clone)]
 pub struct TerrainManager {
     inner: Arc<TerrainManagerInner>,
 }
 
 impl TerrainManager {
-    fn start() -> Result<Self, CacheError> {
+    fn start(log: Log) -> Result<Self, CacheError> {
         thread::spawn(|| loop {});
 
         let config = CacheConfig {
@@ -114,6 +131,7 @@ impl TerrainManager {
         let cache = TerrainCache::initialize(path, config)?;
 
         let inner = Arc::new(TerrainManagerInner {
+            logger: Logger::root(log, o!("component" => "TerrainManager")),
             cache: Mutex::new(cache),
             receivers: Mutex::new(Vec::new()),
         });
@@ -126,16 +144,19 @@ impl TerrainManager {
         patch_handle: PatchHandle,
     ) -> Box<Future<Item = TerrainPatch, Error = GetPatchError>> {
         // Extract queue entries.
+        println!("pre extract queues");
         match self.inner.extract_queues() {
             Err(e) => return Box::new(future::err(GetPatchError::CacheError(e))),
             _ => {}
         }
 
         // Check if it is in the cache.
+        println!("before checking cache");
         let cache_item = {
             let mut cache = self.inner.cache.lock().unwrap();
             cache.get(&patch_handle)
         };
+        println!("after checking cache");
 
         match cache_item {
             Ok(Some(item)) => Box::new(future::ok(item)),
@@ -163,10 +184,12 @@ impl Future for PendingPatch {
     type Error = GetPatchError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        println!("poll");
         match self.terrain_manager.extract_queues() {
             Err(e) => return Err(GetPatchError::CacheError(e)),
             _ => {}
         }
+        println!("poll1");
         let item = {
             let mut cache = self.terrain_manager.cache.lock().unwrap();
             cache
@@ -174,14 +197,18 @@ impl Future for PendingPatch {
                 .map_err(|e| GetPatchError::CacheError(e))?
         };
 
+        println!("poll2");
         if let Some(patch) = item {
+            println!("poll ready");
             Ok(Async::Ready(patch))
         } else {
+            println!("poll not ready");
             Ok(Async::NotReady)
         }
     }
 }
 
+#[derive(Debug)]
 pub enum GetPatchError {
     NotAvailable,
     CacheError(CacheError),

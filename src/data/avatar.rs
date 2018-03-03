@@ -96,7 +96,7 @@ impl ClientAvatar {
         // y-axis in the world, z-axis in the rendering.
         let default_dir = Vector3::y_axis();
         let fwd = self.head_rotation.rotate_vector(&default_dir);
-        println!("fwd: {:?}", fwd);
+        //println!("fwd: {:?}", fwd);
         if self.pressed_up {
             self.loc.rel_pos += fwd;
         } else if self.pressed_down {
