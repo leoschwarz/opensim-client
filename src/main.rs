@@ -22,6 +22,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate simple_disk_cache;
 #[macro_use]
 extern crate slog;
 extern crate tokio;
@@ -70,32 +71,41 @@ fn main() {
     let (region_id_tx, region_id_rx) = mpsc::channel();
 
     // Note: With the default stack size of 2 MiB this code overflows the stack.
-    //       However in general I don't really like this solution of just making the stack bigger.
+    // However in general I don't really like this solution of just making
+    // the stack bigger.
     let builder = thread::Builder::new().stack_size(8 * 1024 * 1024);
-    builder.spawn(move || {
-        let mut region_manager = Box::new(RegionManager::start(log.clone()));
-        let mut reactor = Core::new().unwrap();
-        let handle = reactor.handle();
+    builder
+        .spawn(move || {
+            let mut region_manager = Box::new(RegionManager::start(log.clone()));
+            let mut reactor = Core::new().unwrap();
+            let handle = reactor.handle();
 
-        println!("connecting sim");
-        let sim = reactor.run(Simulator::connect(connect_info, handlers, handle, log)).unwrap();
-        println!("connecting sim finished");
-        region_id_tx.send(sim.region_info().region_id.clone()).unwrap();
-        let region_id = sim.region_info().region_id.clone();
-        region_manager.setup_sim(sim);
+            println!("connecting sim");
+            let sim = reactor
+                .run(Simulator::connect(connect_info, handlers, handle, log))
+                .unwrap();
+            println!("connecting sim finished");
+            region_id_tx
+                .send(sim.region_info().region_id.clone())
+                .unwrap();
+            let region_id = sim.region_info().region_id.clone();
+            region_manager.setup_sim(sim);
 
-        terrain_manager_tx.send(region_manager.terrain_manager.clone()).unwrap();
+            terrain_manager_tx
+                .send(region_manager.terrain_manager.clone())
+                .unwrap();
 
-        let patch_handle = (region_id, Vector2::new(0, 0));
-        let fut = region_manager.terrain_manager.get_patch(patch_handle);
-        let patch = reactor.run(fut).unwrap();
+            let patch_handle = (region_id, Vector2::new(0, 0));
+            let fut = region_manager.terrain_manager.get_patch(patch_handle);
+            let patch = reactor.run(fut).unwrap();
 
-        println!("patch: {:?}", patch);
+            println!("patch: {:?}", patch);
 
-        loop {
-            reactor.turn(None);
-        }
-    }).unwrap();
+            loop {
+                reactor.turn(None);
+            }
+        })
+        .unwrap();
 
     let terrain_manager = terrain_manager_rx.recv().unwrap();
     let region_id = region_id_rx.recv().unwrap();

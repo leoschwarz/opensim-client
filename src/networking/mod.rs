@@ -13,6 +13,7 @@ use nalgebra::Vector2;
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::Simulator;
 use opensim_networking::services::terrain;
+use simple_disk_cache::config::DataEncoding;
 use std::collections::HashMap;
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex};
@@ -31,7 +32,8 @@ pub struct RegionManager {
 impl RegionManager {
     pub fn start(log: Log) -> Self {
         // TODO: Remove the expect.
-        let terrain_manager = TerrainManager::start(log.clone()).expect("Setting up terrain_manager failed.");
+        let terrain_manager =
+            TerrainManager::start(log.clone()).expect("Setting up terrain_manager failed.");
 
         RegionManager {
             simulators: HashMap::new(),
@@ -76,14 +78,20 @@ impl TerrainManagerInner {
                 debug!(self.logger, "TerrainManager::extract_queues loop");
                 match receiver.land_patches.try_recv() {
                     Ok(patches) => {
-                        debug!(self.logger, "TerrainManager::extract_queues received patches");
+                        debug!(
+                            self.logger,
+                            "TerrainManager::extract_queues received patches"
+                        );
                         let mut cache = self.cache.lock().unwrap();
                         for patch in &patches {
                             let pos = patch.patch_position();
                             let pos = Vector2::new(pos.0 as u8, pos.1 as u8);
 
                             let patch_handle = (region_id.clone(), pos);
-                            debug!(self.logger, "Received terrain patch for: {:?}", patch_handle);
+                            debug!(
+                                self.logger,
+                                "Received terrain patch for: {:?}", patch_handle
+                            );
                             cache.put(
                                 &patch_handle,
                                 &TerrainPatch {
@@ -124,6 +132,7 @@ impl TerrainManager {
         let config = CacheConfig {
             // 1 GiB
             max_bytes: 1 * 1024 * 1024 * 1024,
+            encoding: DataEncoding::Json,
         };
 
         // Make configurable.
