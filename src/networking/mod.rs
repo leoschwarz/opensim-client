@@ -13,7 +13,7 @@ use nalgebra::Vector2;
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::Simulator;
 use opensim_networking::services::terrain;
-use simple_disk_cache::config::DataEncoding;
+use simple_disk_cache::config::{CacheStrategy, DataEncoding};
 use std::collections::HashMap;
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex};
@@ -133,10 +133,12 @@ impl TerrainManager {
             // 1 GiB
             max_bytes: 1 * 1024 * 1024 * 1024,
             encoding: DataEncoding::Json,
+            strategy: CacheStrategy::LRU,
+            subdirs_per_level: 20,
         };
 
         // Make configurable.
-        let path = "target/cache/terrain".into();
+        let path = "target/cache/terrain";
         let cache = TerrainCache::initialize(path, config)?;
 
         let inner = Arc::new(TerrainManagerInner {
