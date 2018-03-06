@@ -9,6 +9,7 @@
 extern crate addressable_queue;
 extern crate alga;
 extern crate chashmap;
+extern crate crossbeam_channel;
 #[macro_use]
 extern crate futures_await as futures;
 #[macro_use]
@@ -73,7 +74,7 @@ fn main() {
     // Note: With the default stack size of 2 MiB this code overflows the stack.
     // However in general I don't really like this solution of just making
     // the stack bigger.
-    let builder = thread::Builder::new().stack_size(8 * 1024 * 1024);
+    let builder = thread::Builder::new().stack_size(16 * 1024 * 1024);
     builder
         .spawn(move || {
             let mut region_manager = Box::new(RegionManager::start(log.clone()));
@@ -99,7 +100,7 @@ fn main() {
             let fut = region_manager.terrain_manager.get_patch(patch_handle);
             let patch = reactor.run(fut).unwrap();
 
-            println!("patch: {:?}", patch);
+            println!("patch received !");
 
             loop {
                 reactor.turn(None);

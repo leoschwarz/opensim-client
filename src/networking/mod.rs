@@ -7,8 +7,9 @@
 
 use cache::{CacheConfig, CacheError, TerrainCache};
 use chashmap::CHashMap;
+use crossbeam_channel;
 use data::TerrainPatch;
-use futures::{future, Async, Future, Poll};
+use futures::{future, task, Async, Future, Poll};
 use nalgebra::Vector2;
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::Simulator;
@@ -62,57 +63,44 @@ struct TerrainManagerInner {
 }
 
 impl TerrainManagerInner {
-    // TODO: For performance reasons this method should be aware of what we are
-    // looking for and not be called when it is available, and if it is not
-    // available upfront it should immediately return once the relevant data is
-    // encountered even if new data is available.
-    //
-    // (Maybe it's safer to only do the second check, since otherwise we might end
-    // up  using outdated cache data.)
-    /// Extracts all available messages from the receiver queues.
+    /// Extracts some (but not necessarily all) available messages from the
+    /// receiver queues.
     fn extract_queues(&self) -> Result<(), CacheError> {
-        debug!(self.logger, "TerrainManager::extract_queues invoked.");
         let receivers = self.receivers.lock().unwrap();
+        //let mut iter_count = 0;
         for &(ref region_id, ref receiver) in receivers.iter() {
-            loop {
-                debug!(self.logger, "TerrainManager::extract_queues loop");
-                match receiver.land_patches.try_recv() {
-                    Ok(patches) => {
+            match receiver.land_patches.try_recv() {
+                Ok(patches) => {
+                    debug!(
+                        self.logger,
+                        "TerrainManager::extract_queues received patches"
+                    );
+                    let mut cache = self.cache.lock().unwrap();
+                    for patch in &patches {
+                        let pos = patch.patch_position();
+                        let pos = Vector2::new(pos.0 as u8, pos.1 as u8);
+
+                        let patch_handle = (region_id.clone(), pos);
                         debug!(
                             self.logger,
-                            "TerrainManager::extract_queues received patches"
+                            "Received terrain patch for: {:?}", patch_handle
                         );
-                        let mut cache = self.cache.lock().unwrap();
-                        for patch in &patches {
-                            let pos = patch.patch_position();
-                            let pos = Vector2::new(pos.0 as u8, pos.1 as u8);
-
-                            let patch_handle = (region_id.clone(), pos);
-                            debug!(
-                                self.logger,
-                                "Received terrain patch for: {:?}", patch_handle
-                            );
-                            cache.put(
-                                &patch_handle,
-                                &TerrainPatch {
-                                    position: pos,
-                                    region: region_id.clone(),
-                                    // TODO: this resize should be checked.
-                                    land_heightmap: patch.data().clone().fixed_resize(-1.),
-                                },
-                            )?;
-                            debug!(self.logger, "Cached terrain patch for: {:?}", patch_handle);
-                        }
+                        cache.put(
+                            &patch_handle,
+                            &TerrainPatch {
+                                position: pos,
+                                region: region_id.clone(),
+                                // TODO: this resize should be checked.
+                                land_heightmap: patch.data().clone().fixed_resize(-1.),
+                            },
+                        )?;
+                        debug!(self.logger, "Cached terrain patch for: {:?}", patch_handle);
                     }
-                    Err(mpsc::TryRecvError::Empty) => {
-                        debug!(self.logger, "Channel empty.");
-                        break;
-                    }
-                    Err(mpsc::TryRecvError::Disconnected) => {
-                        debug!(self.logger, "Channel disconnected.");
-                        // TODO: Delete the receiver.
-                        break;
-                    }
+                }
+                Err(crossbeam_channel::TryRecvError::Empty) => {}
+                Err(crossbeam_channel::TryRecvError::Disconnected) => {
+                    debug!(self.logger, "Channel disconnected.");
+                    // TODO: Delete the receiver.
                 }
             }
         }
@@ -132,7 +120,7 @@ impl TerrainManager {
         let config = CacheConfig {
             // 1 GiB
             max_bytes: 1 * 1024 * 1024 * 1024,
-            encoding: DataEncoding::Json,
+            encoding: DataEncoding::Bincode,
             strategy: CacheStrategy::LRU,
             subdirs_per_level: 20,
         };
@@ -155,19 +143,16 @@ impl TerrainManager {
         patch_handle: PatchHandle,
     ) -> Box<Future<Item = TerrainPatch, Error = GetPatchError>> {
         // Extract queue entries.
-        println!("pre extract queues");
         match self.inner.extract_queues() {
             Err(e) => return Box::new(future::err(GetPatchError::CacheError(e))),
             _ => {}
         }
 
         // Check if it is in the cache.
-        println!("before checking cache");
         let cache_item = {
             let mut cache = self.inner.cache.lock().unwrap();
             cache.get(&patch_handle)
         };
-        println!("after checking cache");
 
         match cache_item {
             Ok(Some(item)) => Box::new(future::ok(item)),
@@ -195,12 +180,9 @@ impl Future for PendingPatch {
     type Error = GetPatchError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        println!("poll");
-        match self.terrain_manager.extract_queues() {
-            Err(e) => return Err(GetPatchError::CacheError(e)),
-            _ => {}
+        if let Err(e) = self.terrain_manager.extract_queues() {
+            return Err(GetPatchError::CacheError(e));
         }
-        println!("poll1");
         let item = {
             let mut cache = self.terrain_manager.cache.lock().unwrap();
             cache
@@ -208,12 +190,10 @@ impl Future for PendingPatch {
                 .map_err(|e| GetPatchError::CacheError(e))?
         };
 
-        println!("poll2");
         if let Some(patch) = item {
-            println!("poll ready");
             Ok(Async::Ready(patch))
         } else {
-            println!("poll not ready");
+            task::current().notify();
             Ok(Async::NotReady)
         }
     }
