@@ -3,14 +3,16 @@
 //! Targets OpenGL 3.1 and GLSL 1.40 for now.
 
 use data;
+use data::World;
 use data::avatar::ClientAvatar;
 use glium::{self, glutin, Surface};
 use glium::index::PrimitiveType;
 use nalgebra::Vector3;
 use std::time::{Duration, Instant};
 use std::thread;
+use std::sync::Arc;
 
-pub fn render_world() {
+pub fn render_world(world: Arc<World>) {
     // Setup display.
     // TODO: Maybe this does not belong into the render world method?
     let mut events_loop = glutin::EventsLoop::new();

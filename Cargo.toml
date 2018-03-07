@@ -18,6 +18,7 @@ lazy_static = "1.0.0"
 multiqueue = { git = "https://github.com/leoschwarz/multiqueue" }
 nalgebra = { version = "0.14", features = ["serde-serialize"] }
 opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
+parking_lot = "0.5.4"
 rmp-serde = "0.13.7"
 serde = "1.0"
 serde_derive = "1.0"

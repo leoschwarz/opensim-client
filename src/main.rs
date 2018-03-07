@@ -19,6 +19,7 @@ extern crate lazy_static;
 extern crate multiqueue;
 extern crate nalgebra;
 extern crate opensim_networking;
+extern crate parking_lot;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -40,15 +41,16 @@ pub mod render;
 
 fn main() {
     use futures::Future;
+    use nalgebra::Vector2;
+    use networking::RegionManager;
+    use opensim_networking::circuit::message_handlers::Handlers;
     use opensim_networking::logging::{Log, LogLevel};
     use opensim_networking::login::{hash_password, LoginRequest};
     use opensim_networking::simulator::Simulator;
-    use opensim_networking::circuit::message_handlers::Handlers;
-    use nalgebra::Vector2;
-    use networking::RegionManager;
-    use tokio_core::reactor::Core;
-    use std::thread;
+    use parking_lot::RwLock;
     use std::sync::{mpsc, Arc, Mutex};
+    use std::thread;
+    use tokio_core::reactor::Core;
 
     // Perform the login.
     let cfg = config::get_config("remote_sim.toml").expect("no config");
@@ -70,6 +72,7 @@ fn main() {
     // Connect to the simulator.
     let (terrain_manager_tx, terrain_manager_rx) = mpsc::channel();
     let (region_id_tx, region_id_rx) = mpsc::channel();
+    let (patch_tx, patch_rx) = crossbeam_channel::bounded(0);
 
     // Note: With the default stack size of 2 MiB this code overflows the stack.
     // However in general I don't really like this solution of just making
@@ -100,7 +103,7 @@ fn main() {
             let fut = region_manager.terrain_manager.get_patch(patch_handle);
             let patch = reactor.run(fut).unwrap();
 
-            println!("patch received !");
+            patch_tx.send(patch).unwrap();
 
             loop {
                 reactor.turn(None);
@@ -110,11 +113,23 @@ fn main() {
 
     let terrain_manager = terrain_manager_rx.recv().unwrap();
     let region_id = region_id_rx.recv().unwrap();
-    let patch_handle = (region_id, Vector2::new(0, 0));
+    //let patch_handle = (region_id, Vector2::new(0, 0));
     //let mut reactor = Core::new().unwrap();
     //let patch = reactor.run(terrain_manager.get_patch(patch_handle)).unwrap();
 
+    let patch = patch_rx.recv().unwrap();
+    println!("received patch!");
+
     //println!("patch: {:?}", patch);
 
-    render::render_world();
+    let current_region = data::Region {
+        size: 256,
+        id: region_id,
+        grid_location: Vector2::new(0, 0),
+    };
+    let world = Arc::new(data::World {
+        current_region: RwLock::new(current_region),
+    });
+
+    render::render_world(world);
 }

@@ -4,11 +4,14 @@
 pub use nalgebra::{DMatrix, Matrix4, MatrixN, Quaternion, UnitQuaternion, Vector2, Vector3};
 pub use opensim_networking::types::Uuid;
 use typenum;
+use std::sync::Mutex;
+use parking_lot::RwLock;
 
 pub mod avatar;
 pub mod entities;
 
-// TODO:
+/*
+// (old notes)
 // - Should manage the current region and the ones adjacent to it.
 // - For compatibility regions are generally required to be of the same
 //   size as their neighbours, however maybe the code could actually be
@@ -32,17 +35,33 @@ pub mod entities;
 // - This should probably be implemented with an inner struct which can be
 // updated   by the networking thread and use a mutex inside.
 //   (I would prefer RwLock but writer starvation is a big problem for us.)
-pub struct World {}
+*/
+/// Provides access to the current state of the whole world, to be rendered.
+///
+/// # State management (TODO)
+///
+/// Code in the `render` module should only require read access to the world.
+/// TODO: How to decouple the user input from rendering. (If this is done concerns
+/// regarding to that can be alleviated easily.)
+///
+/// 
+///
+/// 
+pub struct World {
+    pub current_region: RwLock<Region>,
+    // TODO
+    //pub client_avatar: RwLock<avatar::ClientAvatar>,
+}
 
 pub struct Region {
     /// Side length of the region in meters.
-    size: u32,
+    pub size: u32,
 
     /// The unique ID of the region.
-    id: Uuid,
+    pub id: Uuid,
 
     /// The location of the region on the grid.
-    grid_location: Vector2<u32>,
+    pub grid_location: Vector2<u32>,
 }
 
 impl Region {
