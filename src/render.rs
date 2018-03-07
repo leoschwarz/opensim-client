@@ -11,8 +11,9 @@ use nalgebra::Vector3;
 use std::time::{Duration, Instant};
 use std::thread;
 use std::sync::Arc;
+use typed_rwlock::RwLockReader;
 
-pub fn render_world(world: Arc<World>) {
+pub fn render_world(world: RwLockReader<World>) {
     // Setup display.
     // TODO: Maybe this does not belong into the render world method?
     let mut events_loop = glutin::EventsLoop::new();

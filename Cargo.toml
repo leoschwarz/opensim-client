@@ -29,5 +29,6 @@ slog = "2.0"
 tokio = "0.1.1"
 tokio-core = "0.1.10"
 toml = "0.4.5"
+typed_rwlock = { git = "https://github.com/leoschwarz/typed_rwlock" }
 typenum = "1.9"
 uuid = "0.6.0"

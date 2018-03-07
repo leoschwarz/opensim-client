@@ -30,6 +30,7 @@ extern crate slog;
 extern crate tokio;
 extern crate tokio_core;
 extern crate toml;
+extern crate typed_rwlock;
 extern crate typenum;
 extern crate uuid;
 
@@ -51,6 +52,7 @@ fn main() {
     use std::sync::{mpsc, Arc, Mutex};
     use std::thread;
     use tokio_core::reactor::Core;
+    use typed_rwlock;
 
     // Perform the login.
     let cfg = config::get_config("remote_sim.toml").expect("no config");
@@ -69,11 +71,14 @@ fn main() {
     let connect_info = login_response.into();
     let handlers = Handlers::default();
 
-    // Connect to the simulator.
-    let (terrain_manager_tx, terrain_manager_rx) = mpsc::channel();
-    let (region_id_tx, region_id_rx) = mpsc::channel();
-    let (patch_tx, patch_rx) = crossbeam_channel::bounded(0);
+    // Setup world representation.
+    let world = data::World {
+        current_region: data::RegionConnection::Pending,
+    };
+    let (world_reader, world_writer) = typed_rwlock::new(world);
 
+    // Connect to the simulator.
+    //
     // Note: With the default stack size of 2 MiB this code overflows the stack.
     // However in general I don't really like this solution of just making
     // the stack bigger.
@@ -89,21 +94,25 @@ fn main() {
                 .run(Simulator::connect(connect_info, handlers, handle, log))
                 .unwrap();
             println!("connecting sim finished");
-            region_id_tx
-                .send(sim.region_info().region_id.clone())
-                .unwrap();
+
+            {
+                let region = data::Region {
+                    id: sim.region_info().region_id.clone(),
+                    // TODO !!!
+                    size: 256,
+                    // TODO !!!
+                    grid_location: Vector2::new(0, 0),
+                };
+                let mut world = world_writer.write();
+                world.current_region = data::RegionConnection::Connected(region);
+            }
+
             let region_id = sim.region_info().region_id.clone();
             region_manager.setup_sim(sim);
-
-            terrain_manager_tx
-                .send(region_manager.terrain_manager.clone())
-                .unwrap();
 
             let patch_handle = (region_id, Vector2::new(0, 0));
             let fut = region_manager.terrain_manager.get_patch(patch_handle);
             let patch = reactor.run(fut).unwrap();
-
-            patch_tx.send(patch).unwrap();
 
             loop {
                 reactor.turn(None);
@@ -111,25 +120,5 @@ fn main() {
         })
         .unwrap();
 
-    let terrain_manager = terrain_manager_rx.recv().unwrap();
-    let region_id = region_id_rx.recv().unwrap();
-    //let patch_handle = (region_id, Vector2::new(0, 0));
-    //let mut reactor = Core::new().unwrap();
-    //let patch = reactor.run(terrain_manager.get_patch(patch_handle)).unwrap();
-
-    let patch = patch_rx.recv().unwrap();
-    println!("received patch!");
-
-    //println!("patch: {:?}", patch);
-
-    let current_region = data::Region {
-        size: 256,
-        id: region_id,
-        grid_location: Vector2::new(0, 0),
-    };
-    let world = Arc::new(data::World {
-        current_region: RwLock::new(current_region),
-    });
-
-    render::render_world(world);
+    render::render_world(world_reader);
 }

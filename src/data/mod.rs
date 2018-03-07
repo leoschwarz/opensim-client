@@ -40,25 +40,40 @@ pub mod entities;
 ///
 /// # State management (TODO)
 ///
-/// Code in the `render` module should only require read access to the world.
-/// TODO: How to decouple the user input from rendering. (If this is done concerns
-/// regarding to that can be alleviated easily.)
+/// In this case it is a multi-producer single consumer problem.
 ///
-/// 
+/// The networking thread and the GUI thread shall write,
+/// the rendering thread shall only read.
 ///
-/// 
+/// For this reason the `typed_rwlock` crate is used.
+/// Currently this does not provide any advantage but maybe in the future
+/// this could be utilized to use an even better synchronization primitive.
+/// (TODO)
 pub struct World {
-    pub current_region: RwLock<Region>,
+    pub current_region: RegionConnection,
     // TODO
     //pub client_avatar: RwLock<avatar::ClientAvatar>,
 }
 
-pub struct Region {
-    /// Side length of the region in meters.
-    pub size: u32,
+pub enum RegionConnection {
+    /// The connection to the region is not yet established.
+    ///
+    /// This should be displayed to the user if needed.
+    Pending,
 
+    /// The connection to the region is established.
+    Connected(Region),
+
+    /// The connection to the region was dropped.
+    Disconnected,
+}
+
+pub struct Region {
     /// The unique ID of the region.
     pub id: Uuid,
+
+    /// Side length of the region in meters.
+    pub size: u32,
 
     /// The location of the region on the grid.
     pub grid_location: Vector2<u32>,
