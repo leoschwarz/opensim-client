@@ -10,7 +10,7 @@ use chashmap::CHashMap;
 use crossbeam_channel;
 use data::TerrainPatch;
 use futures::{future, task, Async, Future, Poll};
-use nalgebra::Vector2;
+use types::Vector2;
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::Simulator;
 use opensim_networking::services::terrain;
@@ -20,7 +20,7 @@ use std::thread;
 use std::sync::{mpsc, Arc, Mutex};
 use std::path::PathBuf;
 use slog::{Drain, Logger};
-use uuid::Uuid;
+use types::Uuid;
 
 /// Manages the interaction between Viewer and Region.
 pub struct RegionManager {

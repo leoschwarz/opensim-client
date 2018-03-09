@@ -7,7 +7,7 @@ use data::World;
 use data::avatar::ClientAvatar;
 use glium::{self, glutin, Surface};
 use glium::index::PrimitiveType;
-use nalgebra::Vector3;
+use types::Vector3;
 use std::time::{Duration, Instant};
 use std::thread;
 use std::sync::Arc;

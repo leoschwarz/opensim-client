@@ -17,8 +17,8 @@ extern crate glium;
 #[macro_use]
 extern crate lazy_static;
 extern crate multiqueue;
-extern crate nalgebra;
 extern crate opensim_networking;
+extern crate opensim_types as types;
 extern crate parking_lot;
 extern crate serde;
 #[macro_use]
@@ -32,7 +32,6 @@ extern crate tokio_core;
 extern crate toml;
 extern crate typed_rwlock;
 extern crate typenum;
-extern crate uuid;
 
 pub mod cache;
 pub mod config;
@@ -42,7 +41,6 @@ pub mod render;
 
 fn main() {
     use futures::Future;
-    use nalgebra::Vector2;
     use networking::RegionManager;
     use opensim_networking::circuit::message_handlers::Handlers;
     use opensim_networking::logging::{Log, LogLevel};
@@ -53,6 +51,7 @@ fn main() {
     use std::thread;
     use tokio_core::reactor::Core;
     use typed_rwlock;
+    use types::Vector2;
 
     // Perform the login.
     let cfg = config::get_config("remote_sim.toml").expect("no config");
@@ -96,12 +95,14 @@ fn main() {
             println!("connecting sim finished");
 
             {
+                let patches_per_side = 16; // TODO
                 let region = data::Region {
                     id: sim.region_info().region_id.clone(),
                     // TODO !!!
                     size: 256,
                     // TODO !!!
                     grid_location: Vector2::new(0, 0),
+                    terrain: data::Terrain::empty(patches_per_side),
                 };
                 let mut world = world_writer.write();
                 world.current_region = data::RegionConnection::Connected(region);

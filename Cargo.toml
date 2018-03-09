@@ -16,8 +16,8 @@ lazy_static = "1.0.0"
 #multiqueue = "0.3.2"
 # use git version until https://github.com/leoschwarz/multiqueue/commit/998c381b05e287cd238cd0dccbcb7771c1442328 lands in crates.io version.
 multiqueue = { git = "https://github.com/leoschwarz/multiqueue" }
-nalgebra = { version = "0.14", features = ["serde-serialize"] }
 opensim_networking = { git = "https://github.com/leoschwarz/opensim-networking" }
+opensim_types = { git = "https://github.com/leoschwarz/opensim-networking" }
 parking_lot = "0.5.4"
 rmp-serde = "0.13.7"
 serde = "1.0"
@@ -31,4 +31,3 @@ tokio-core = "0.1.10"
 toml = "0.4.5"
 typed_rwlock = { git = "https://github.com/leoschwarz/typed_rwlock" }
 typenum = "1.9"
-uuid = "0.6.0"

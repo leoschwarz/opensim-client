@@ -1,16 +1,30 @@
 //! This module contains the types which represent the data that represents the
 //! state of the simulator and is to be rendered on the screen.
 
-pub use nalgebra::{DMatrix, Matrix4, MatrixN, Quaternion, UnitQuaternion, Vector2, Vector3};
+// TODO: For now the solution with the typed_rwlock around World is good enough.
+// However in the future there should be a lot more granular control about
+// locking because for example if a terrain patch is received it makes no sense
+// to also lock something completely different.
+// This could have a huge performance impact.
+// What would be really nice to explore would be how far currently locked things
+// could be skipped and other rendering work be performed, before it is
+// unlocked again.
+
+pub use types::nalgebra::{DMatrix, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
+use types::nalgebra::{Matrix, MatrixN, MatrixVec};
 pub use opensim_networking::types::Uuid;
 use typenum;
 use std::sync::Mutex;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 
 pub mod avatar;
 pub mod entities;
 
-/*
+// TODO
+pub type PatchMatrix<S> = MatrixN<S, typenum::U256>;
+
+/*  */
 // (old notes)
 // - Should manage the current region and the ones adjacent to it.
 // - For compatibility regions are generally required to be of the same
@@ -35,7 +49,7 @@ pub mod entities;
 // - This should probably be implemented with an inner struct which can be
 // updated   by the networking thread and use a mutex inside.
 //   (I would prefer RwLock but writer starvation is a big problem for us.)
-*/
+//
 /// Provides access to the current state of the whole world, to be rendered.
 ///
 /// # State management (TODO)
@@ -51,8 +65,8 @@ pub mod entities;
 /// (TODO)
 pub struct World {
     pub current_region: RegionConnection,
-    // TODO
-    //pub client_avatar: RwLock<avatar::ClientAvatar>,
+    /* TODO */
+    /* pub client_avatar: RwLock<avatar::ClientAvatar>, */
 }
 
 pub enum RegionConnection {
@@ -77,17 +91,9 @@ pub struct Region {
 
     /// The location of the region on the grid.
     pub grid_location: Vector2<u32>,
-}
 
-impl Region {
-    /// Side length of the region in meters.
-    pub fn size(&self) -> u32 {
-        self.size
-    }
-
-    pub fn terrain(&self) -> Terrain {
-        unimplemented!()
-    }
+    /// The (currently available) terrain data.
+    pub terrain: Terrain,
 }
 
 // TODO:
@@ -98,11 +104,27 @@ impl Region {
 //   - Make TerrainPatch serializable and implement a disk caching strategy,
 //     where patches around the player are kept in memory.
 //   - For now store everything in RAM.
-pub struct Terrain {}
+pub struct Terrain {
+    patches: HashMap<Vector2<u8>, Option<TerrainPatch>>,
+}
 
 impl Terrain {
-    pub fn get_patch(&mut self, pos: Vector2<u8>) -> Result<TerrainPatch, ()> {
-        unimplemented!()
+    pub fn empty(patches_per_side: u8) -> Terrain {
+        let mut patches = HashMap::new();
+        for i in 0..patches_per_side {
+            for j in 0..patches_per_side {
+                patches.insert(Vector2::new(i, j), None);
+            }
+        }
+        Terrain { patches: patches }
+    }
+
+    pub fn insert_patch(&mut self, patch: TerrainPatch) {
+        self.patches.insert(patch.position.clone(), Some(patch));
+    }
+
+    pub fn get_patch(&self, position: &Vector2<u8>) -> &Option<TerrainPatch> {
+        self.patches.get(position).expect("invalid patch position")
     }
 }
 
@@ -128,8 +150,6 @@ impl TerrainPatch {
         }
     }
 }
-
-pub type PatchMatrix<S> = MatrixN<S, typenum::U256>;
 
 // TODO: I'm very unhappy with these.
 pub mod locators {
