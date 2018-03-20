@@ -10,19 +10,46 @@
 // could be skipped and other rendering work be performed, before it is
 // unlocked again.
 
-pub use types::nalgebra::{DMatrix, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
-use types::nalgebra::{Matrix, MatrixN, MatrixVec};
+use types::{DMatrix, Matrix4, MatrixN, Quaternion, UnitQuaternion, Vector2, Vector3};
+use types::nalgebra::{Matrix, MatrixVec};
+use types::nalgebra::core::dimension::U256;
 pub use opensim_networking::types::Uuid;
-use typenum;
 use std::sync::Mutex;
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::sync::atomic::AtomicUsize;
+use std::sync::Arc;
+
+pub trait RevisionId {
+    fn revision_id(&self) -> usize;
+}
+
+/// P: Parent
+/// E: Entity (self)
+pub struct Entity<P, E> {
+    revision_id: AtomicUsize,
+    parent: Arc<P>,
+    value: Mutex<T>,
+}
+
+impl<P, E> Entity<P, E> where P: RevisionId {
+    fn new(parent: Arc<P>, value: E) -> Self {
+        Entity {
+            revision_id: AtomicUsize::new(parent.revision_id()),
+            parent: parent,
+            value: Mutex::new(value),
+        }
+    }
+}
 
 pub mod avatar;
 pub mod entities;
 
-// TODO
+/*
 pub type PatchMatrix<S> = MatrixN<S, typenum::U256>;
+*/
+
+pub type PatchMatrix<S> = Matrix<S, U256, U256, MatrixVec<S, U256, U256>>;
 
 /*  */
 // (old notes)

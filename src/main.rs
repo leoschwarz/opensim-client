@@ -27,6 +27,7 @@ extern crate serde_json;
 extern crate simple_disk_cache;
 #[macro_use]
 extern crate slog;
+extern crate specs;
 extern crate tokio;
 extern crate tokio_core;
 extern crate toml;

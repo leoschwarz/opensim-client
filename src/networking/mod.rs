@@ -85,13 +85,15 @@ impl TerrainManagerInner {
                             self.logger,
                             "Received terrain patch for: {:?}", patch_handle
                         );
+                        use data::PatchMatrix;
                         cache.put(
                             &patch_handle,
                             &TerrainPatch {
                                 position: pos,
                                 region: region_id.clone(),
+                                land_heightmap: PatchMatrix::from_data(patch.data().data),
                                 // TODO: this resize should be checked.
-                                land_heightmap: patch.data().clone().fixed_resize(-1.),
+                                //land_heightmap: patch.data().clone().resize_generic(U256::name(), U256::name(), -1.),
                             },
                         )?;
                         debug!(self.logger, "Cached terrain patch for: {:?}", patch_handle);
