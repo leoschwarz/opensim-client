@@ -10,7 +10,7 @@ use chashmap::CHashMap;
 use crossbeam_channel;
 use data::TerrainPatch;
 use futures::{future, task, Async, Future, Poll};
-use types::Vector2;
+use types::{Vector2, DMatrix};
 use opensim_networking::logging::Log;
 use opensim_networking::simulator::Simulator;
 use opensim_networking::services::terrain;
@@ -76,7 +76,7 @@ impl TerrainManagerInner {
                         "TerrainManager::extract_queues received patches"
                     );
                     let mut cache = self.cache.lock().unwrap();
-                    for patch in &patches {
+                    for patch in patches {
                         let pos = patch.patch_position();
                         let pos = Vector2::new(pos.0 as u8, pos.1 as u8);
 
@@ -85,13 +85,12 @@ impl TerrainManagerInner {
                             self.logger,
                             "Received terrain patch for: {:?}", patch_handle
                         );
-                        use data::PatchMatrix;
                         cache.put(
                             &patch_handle,
                             &TerrainPatch {
                                 position: pos,
                                 region: region_id.clone(),
-                                land_heightmap: PatchMatrix::from_data(patch.data().data),
+                                land_heightmap: patch.to_data(),
                                 // TODO: this resize should be checked.
                                 //land_heightmap: patch.data().clone().resize_generic(U256::name(), U256::name(), -1.),
                             },
