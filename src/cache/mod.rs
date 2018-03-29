@@ -1,4 +1,4 @@
-use data::TerrainPatch;
+use data::terrain::TerrainPatch;
 use data::{ids, terrain};
 pub use simple_disk_cache::CacheError;
 use simple_disk_cache::SimpleCache;

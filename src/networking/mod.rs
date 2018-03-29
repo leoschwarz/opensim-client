@@ -8,7 +8,7 @@
 use cache::{CacheConfig, CacheError, TerrainCache};
 use chashmap::CHashMap;
 use crossbeam_channel;
-use data::TerrainPatch;
+use data::terrain::TerrainPatch;
 use futures::{future, task, Async, Future, Poll};
 use opensim_networking::logging::Log;
 use opensim_networking::services::terrain;
@@ -85,17 +85,17 @@ impl TerrainManagerInner {
                             self.logger,
                             "Received terrain patch for: {:?}", patch_handle
                         );
+                        let data_matrix = patch.to_data();
+                        // TODO fail gracefully
+                        assert_eq!(data_matrix.nrows(), data_matrix.ncols());
                         cache.put(
                             &patch_handle,
-                            &TerrainPatch {
-                                position: pos,
-                                region: region_id.clone(),
-                                land_heightmap: patch.to_data(),
-                                /* TODO: this resize should be checked. */
-                                /*land_heightmap:
-                                 * patch.data().clone().resize_generic(U256::name(),
-                                 * U256::name(), -1.), */
-                            },
+                            &TerrainPatch::new(
+                                region_id.clone(),
+                                data_matrix.nrows(),
+                                pos,
+                                data_matrix,
+                            ),
                         )?;
                         debug!(self.logger, "Cached terrain patch for: {:?}", patch_handle);
                     }

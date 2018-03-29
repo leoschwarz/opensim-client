@@ -22,7 +22,7 @@ pub fn render_world(world: RwLockReader<World>) {
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
     // TODO
-    let terrain_patch = data::TerrainPatch::dummy();
+    let terrain_patch = data::terrain::TerrainPatch::dummy();
 
     // Build the vertex buffer.
     let vertex_buffer = {

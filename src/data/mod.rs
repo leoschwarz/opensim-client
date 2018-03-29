@@ -42,13 +42,23 @@ pub mod terrain {
     use cache::TerrainCache;
     use data::{config, ids};
     use failure::Error;
-    use types::Vector2;
+    use std::sync::Mutex;
+    use types::{DMatrix, Uuid, Vector2};
 
     pub type PatchPosition = Vector2<u8>;
-    pub type PatchSize = Vector2<u8>;
+    pub type PatchSize = usize;
+
+    #[derive(Debug, Fail)]
+    pub enum StorageError {
+        #[fail(display = "Patch was not found.")]
+        NotFound,
+
+        #[fail(display = "Cache error: {}", 0)]
+        Cache(::simple_disk_cache::CacheError),
+    }
 
     pub struct TerrainStorage {
-        cache: TerrainCache,
+        cache: Mutex<TerrainCache>,
     }
 
     impl TerrainStorage {
@@ -64,7 +74,9 @@ pub mod terrain {
             };
             let cache = TerrainCache::initialize(paths.terrain_cache(), config)?;
 
-            Ok(TerrainStorage { cache: cache })
+            Ok(TerrainStorage {
+                cache: Mutex::new(cache),
+            })
         }
 
         pub fn get_patch(
@@ -72,17 +84,38 @@ pub mod terrain {
             region: &ids::RegionId,
             patch_size: &PatchSize,
             patch_pos: &PatchPosition,
-        ) -> Result<TerrainPatch, ()> {
-            unimplemented!()
+        ) -> Result<TerrainPatch, StorageError> {
+            let mut cache = self.cache.lock().unwrap();
+            let res = cache
+                .get(&(*region, *patch_pos))
+                .map_err(|e| StorageError::Cache(e))?;
+            res.ok_or_else(|| StorageError::NotFound)
         }
     }
 
+    #[derive(Serialize, Deserialize)]
     pub struct TerrainPatch {
+        region: ids::RegionId,
         size: PatchSize,
-        pos: PatchPosition,
+        position: PatchPosition,
+        land_heightmap: DMatrix<f32>,
     }
 
     impl TerrainPatch {
+        pub fn new(
+            region: ids::RegionId,
+            size: PatchSize,
+            position: PatchPosition,
+            land_heightmap: DMatrix<f32>,
+        ) -> Self {
+            TerrainPatch {
+                region,
+                size,
+                position,
+                land_heightmap,
+            }
+        }
+
         /// Returns the size of the patch.
         pub fn size(&self) -> &PatchSize {
             &self.size
@@ -90,7 +123,22 @@ pub mod terrain {
 
         /// Returns the position of the patch.
         pub fn position(&self) -> &PatchPosition {
-            &self.pos
+            &self.position
+        }
+
+        pub fn land_heightmap(&self) -> &DMatrix<f32> {
+            &self.land_heightmap
+        }
+
+        /// TODO: Remove
+        pub fn dummy() -> Self {
+            let raw_data = include!("./layer_land.png.txt");
+            TerrainPatch {
+                position: Vector2::new(0, 0),
+                region: Uuid::nil(),
+                size: 256,
+                land_heightmap: DMatrix::from_fn(256, 256, |x, y| raw_data[x][y]),
+            }
         }
     }
 }
@@ -164,64 +212,6 @@ pub struct Region {
 
     /// The location of the region on the grid.
     pub grid_location: Vector2<u32>,
-
-    /// The (currently available) terrain data.
-    pub terrain: Terrain,
-}
-
-// TODO:
-// - How to store region data?
-//   For a 8192x8192 with 64e6 f32 values we already have 240 MB of data
-//   just for the land height map, obviously we don't want to store everything
-//   in memory.
-//   - Make TerrainPatch serializable and implement a disk caching strategy,
-//     where patches around the player are kept in memory.
-//   - For now store everything in RAM.
-pub struct Terrain {
-    patches: HashMap<Vector2<u8>, Option<TerrainPatch>>,
-}
-
-impl Terrain {
-    pub fn empty(patches_per_side: u8) -> Terrain {
-        let mut patches = HashMap::new();
-        for i in 0..patches_per_side {
-            for j in 0..patches_per_side {
-                patches.insert(Vector2::new(i, j), None);
-            }
-        }
-        Terrain { patches: patches }
-    }
-
-    pub fn insert_patch(&mut self, patch: TerrainPatch) {
-        self.patches.insert(patch.position.clone(), Some(patch));
-    }
-
-    pub fn get_patch(&self, position: &Vector2<u8>) -> &Option<TerrainPatch> {
-        self.patches.get(position).expect("invalid patch position")
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TerrainPatch {
-    pub position: Vector2<u8>,
-    pub region: Uuid,
-    pub land_heightmap: DMatrix<f32>,
-}
-
-impl TerrainPatch {
-    pub fn land_heightmap(&self) -> &DMatrix<f32> {
-        &self.land_heightmap
-    }
-
-    /// TODO: Remove
-    pub fn dummy() -> Self {
-        let raw_data = include!("./layer_land.png.txt");
-        TerrainPatch {
-            position: Vector2::new(0, 0),
-            region: Uuid::nil(),
-            land_heightmap: DMatrix::from_fn(256, 256, |x, y| raw_data[x][y]),
-        }
-    }
 }
 
 // TODO: I'm very unhappy with these.

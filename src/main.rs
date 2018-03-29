@@ -10,6 +10,7 @@ extern crate addressable_queue;
 extern crate alga;
 extern crate chashmap;
 extern crate crossbeam_channel;
+#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate futures_await as futures;
@@ -104,7 +105,6 @@ fn main() {
                     size: 256,
                     // TODO !!!
                     grid_location: Vector2::new(0, 0),
-                    terrain: data::Terrain::empty(patches_per_side),
                 };
                 let mut world = world_writer.write();
                 world.current_region = data::RegionConnection::Connected(region);
