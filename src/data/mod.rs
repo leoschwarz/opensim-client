@@ -21,7 +21,8 @@ pub mod config {
 
     impl Paths {
         pub fn terrain_cache(&self) -> PathBuf {
-            unimplemented!()
+            // TODO
+            "target/cache/terrain".into()
         }
     }
 }
@@ -79,10 +80,23 @@ pub mod terrain {
             })
         }
 
+        pub fn put_patch(
+            &self,
+            region: &ids::RegionId,
+            patch_pos: &PatchPosition,
+            patch: &TerrainPatch,
+        ) -> Result<(), StorageError> {
+            let mut cache = self.cache.lock().unwrap();
+            cache
+                .put(&(*region, *patch_pos), patch)
+                .map_err(|e| StorageError::Cache(e))
+        }
+
         pub fn get_patch(
             &self,
             region: &ids::RegionId,
-            patch_size: &PatchSize,
+            // TODO
+            //patch_size: &PatchSize,
             patch_pos: &PatchPosition,
         ) -> Result<TerrainPatch, StorageError> {
             let mut cache = self.cache.lock().unwrap();

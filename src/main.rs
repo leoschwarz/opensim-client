@@ -87,7 +87,11 @@ fn main() {
     let builder = thread::Builder::new().stack_size(16 * 1024 * 1024);
     builder
         .spawn(move || {
-            let mut region_manager = Box::new(RegionManager::start(log.clone()));
+            let paths = data::config::Paths {};
+            let terrain_storage = Arc::new(
+                data::terrain::TerrainStorage::new(&paths).expect("setup terrain storage failed"),
+            );
+            let mut region_manager = Box::new(RegionManager::start(log.clone(), terrain_storage));
             let mut reactor = Core::new().unwrap();
             let handle = reactor.handle();
 

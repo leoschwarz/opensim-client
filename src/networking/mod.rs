@@ -5,13 +5,12 @@
 //! updating it dynamically, which will then be rendered by different
 //! components of the viewer.
 
-use cache::{CacheConfig, CacheError, TerrainCache};
 use chashmap::CHashMap;
 use crossbeam_channel;
-use data::terrain::TerrainPatch;
+use data::terrain::{self, TerrainPatch, TerrainStorage};
 use futures::{future, task, Async, Future, Poll};
 use opensim_networking::logging::Log;
-use opensim_networking::services::terrain;
+use opensim_networking::services;
 use opensim_networking::simulator::Simulator;
 use simple_disk_cache::config::{CacheStrategy, DataEncoding};
 use slog::{Drain, Logger};
@@ -31,10 +30,8 @@ pub struct RegionManager {
 }
 
 impl RegionManager {
-    pub fn start(log: Log) -> Self {
-        // TODO: Remove the expect.
-        let terrain_manager =
-            TerrainManager::start(log.clone()).expect("Setting up terrain_manager failed.");
+    pub fn start(log: Log, terrain_storage: Arc<TerrainStorage>) -> Self {
+        let terrain_manager = TerrainManager::start(log.clone(), terrain_storage);
 
         RegionManager {
             simulators: HashMap::new(),
@@ -58,14 +55,14 @@ type PatchHandle = (Uuid, Vector2<u8>);
 
 struct TerrainManagerInner {
     logger: Logger,
-    cache: Mutex<TerrainCache>,
-    receivers: Mutex<Vec<(Uuid, terrain::Receivers)>>,
+    storage: Arc<TerrainStorage>,
+    receivers: Mutex<Vec<(Uuid, services::terrain::Receivers)>>,
 }
 
 impl TerrainManagerInner {
     /// Extracts some (but not necessarily all) available messages from the
     /// receiver queues.
-    fn extract_queues(&self) -> Result<(), CacheError> {
+    fn extract_queues(&self) -> Result<(), terrain::StorageError> {
         let receivers = self.receivers.lock().unwrap();
         //let mut iter_count = 0;
         for &(ref region_id, ref receiver) in receivers.iter() {
@@ -75,7 +72,6 @@ impl TerrainManagerInner {
                         self.logger,
                         "TerrainManager::extract_queues received patches"
                     );
-                    let mut cache = self.cache.lock().unwrap();
                     for patch in patches {
                         let pos = patch.patch_position();
                         let pos = Vector2::new(pos.0 as u8, pos.1 as u8);
@@ -88,8 +84,9 @@ impl TerrainManagerInner {
                         let data_matrix = patch.to_data();
                         // TODO fail gracefully
                         assert_eq!(data_matrix.nrows(), data_matrix.ncols());
-                        cache.put(
-                            &patch_handle,
+                        self.storage.put_patch(
+                            region_id,
+                            &pos,
                             &TerrainPatch::new(
                                 region_id.clone(),
                                 data_matrix.nrows(),
@@ -117,57 +114,41 @@ pub struct TerrainManager {
 }
 
 impl TerrainManager {
-    fn start(log: Log) -> Result<Self, CacheError> {
-        thread::spawn(|| loop {});
-
-        let config = CacheConfig {
-            // 1 GiB
-            max_bytes: 1 * 1024 * 1024 * 1024,
-            encoding: DataEncoding::Bincode,
-            strategy: CacheStrategy::LRU,
-            subdirs_per_level: 20,
-        };
-
-        // Make configurable.
-        let path = "target/cache/terrain";
-        let cache = TerrainCache::initialize(path, config)?;
-
+    fn start(log: Log, storage: Arc<TerrainStorage>) -> Self {
         let inner = Arc::new(TerrainManagerInner {
             logger: Logger::root(log, o!("component" => "TerrainManager")),
-            cache: Mutex::new(cache),
+            storage,
             receivers: Mutex::new(Vec::new()),
         });
 
-        Ok(TerrainManager { inner })
+        TerrainManager { inner }
     }
 
     pub fn get_patch(
         &self,
         patch_handle: PatchHandle,
-    ) -> Box<Future<Item = TerrainPatch, Error = GetPatchError>> {
+    ) -> Box<Future<Item = TerrainPatch, Error = terrain::StorageError>> {
         // Extract queue entries.
         match self.inner.extract_queues() {
-            Err(e) => return Box::new(future::err(GetPatchError::CacheError(e))),
+            Err(e) => return Box::new(future::err(e)),
             _ => {}
         }
 
-        // Check if it is in the cache.
-        let cache_item = {
-            let mut cache = self.inner.cache.lock().unwrap();
-            cache.get(&patch_handle)
-        };
-
-        match cache_item {
-            Ok(Some(item)) => Box::new(future::ok(item)),
-            Ok(None) => Box::new(PendingPatch {
+        // Check if it is in the storage.
+        let storage_item = self.inner
+            .storage
+            .get_patch(&patch_handle.0, &patch_handle.1);
+        match storage_item {
+            Ok(item) => Box::new(future::ok(item)),
+            Err(terrain::StorageError::NotFound) => Box::new(PendingPatch {
                 terrain_manager: Arc::clone(&self.inner),
                 patch_handle,
             }),
-            Err(e) => Box::new(future::err(GetPatchError::CacheError(e))),
+            Err(e) => Box::new(future::err(e)),
         }
     }
 
-    fn register_receivers(&self, region_id: Uuid, receivers: terrain::Receivers) {
+    fn register_receivers(&self, region_id: Uuid, receivers: services::terrain::Receivers) {
         let mut all = self.inner.receivers.lock().unwrap();
         all.push((region_id, receivers));
     }
@@ -180,30 +161,21 @@ struct PendingPatch {
 
 impl Future for PendingPatch {
     type Item = TerrainPatch;
-    type Error = GetPatchError;
+    type Error = terrain::StorageError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if let Err(e) = self.terrain_manager.extract_queues() {
-            return Err(GetPatchError::CacheError(e));
-        }
-        let item = {
-            let mut cache = self.terrain_manager.cache.lock().unwrap();
-            cache
-                .get(&self.patch_handle)
-                .map_err(|e| GetPatchError::CacheError(e))?
-        };
+        self.terrain_manager.extract_queues()?;
+        let item = self.terrain_manager
+            .storage
+            .get_patch(&self.patch_handle.0, &self.patch_handle.1);
 
-        if let Some(patch) = item {
-            Ok(Async::Ready(patch))
-        } else {
-            task::current().notify();
-            Ok(Async::NotReady)
+        match item {
+            Ok(patch) => Ok(Async::Ready(patch)),
+            Err(terrain::StorageError::NotFound) => {
+                task::current().notify();
+                Ok(Async::NotReady)
+            }
+            Err(e) => Err(e),
         }
     }
-}
-
-#[derive(Debug)]
-pub enum GetPatchError {
-    NotAvailable,
-    CacheError(CacheError),
 }
