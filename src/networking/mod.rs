@@ -91,8 +91,8 @@ impl TerrainManagerInner {
                                 position: pos,
                                 region: region_id.clone(),
                                 land_heightmap: patch.to_data(),
-                                /* TODO: this resize should be checked.
-                                 *land_heightmap:
+                                /* TODO: this resize should be checked. */
+                                /*land_heightmap:
                                  * patch.data().clone().resize_generic(U256::name(),
                                  * U256::name(), -1.), */
                             },

@@ -9,6 +9,7 @@ addressable_queue = "0.2.0"
 alga = "0.5.2"
 chashmap = "2.2"
 crossbeam-channel = "0.1"
+failure = "0.1"
 futures = "0.1"
 # TODO: https://github.com/alexcrichton/futures-await/issues/79
 #futures-await = "0.1.0"

@@ -10,6 +10,7 @@ extern crate addressable_queue;
 extern crate alga;
 extern crate chashmap;
 extern crate crossbeam_channel;
+extern crate failure;
 #[macro_use]
 extern crate futures_await as futures;
 #[macro_use]

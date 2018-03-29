@@ -14,6 +14,18 @@ use std::collections::HashMap;
 use types::nalgebra::{Matrix, MatrixVec};
 use types::{DMatrix, Matrix4, Quaternion, UnitQuaternion, Uuid, Vector2, Vector3};
 
+pub mod config {
+    use std::path::PathBuf;
+
+    pub struct Paths {}
+
+    impl Paths {
+        pub fn terrain_cache(&self) -> PathBuf {
+            unimplemented!()
+        }
+    }
+}
+
 /// Managment of the various identifiers, often UUIDs are mapped to usize values
 /// so they can be used in other places to save memory.
 pub mod ids {
@@ -21,25 +33,66 @@ pub mod ids {
 
     // TODO replace by u32, u64 or usize
     pub type RegionId = Uuid;
+
+    /// To be used in caches.
+    pub type PersistentRegionId = Uuid;
 }
 
 pub mod terrain {
-    use data::ids;
+    use cache::TerrainCache;
+    use data::{config, ids};
+    use failure::Error;
+    use types::Vector2;
 
-    pub struct TerrainStorage {}
+    pub type PatchPosition = Vector2<u8>;
+    pub type PatchSize = Vector2<u8>;
+
+    pub struct TerrainStorage {
+        cache: TerrainCache,
+    }
 
     impl TerrainStorage {
+        pub fn new(paths: &config::Paths) -> Result<Self, Error> {
+            use simple_disk_cache as sdc;
+
+            let config = sdc::config::CacheConfig {
+                // 128 MiB
+                max_bytes: 128 * 1024 * 1024,
+                encoding: sdc::config::DataEncoding::Bincode,
+                strategy: sdc::config::CacheStrategy::LRU,
+                subdirs_per_level: 20,
+            };
+            let cache = TerrainCache::initialize(paths.terrain_cache(), config)?;
+
+            Ok(TerrainStorage { cache: cache })
+        }
+
         pub fn get_patch(
             &self,
             region: &ids::RegionId,
-            patch_size: (),
-            patch_pos: (),
+            patch_size: &PatchSize,
+            patch_pos: &PatchPosition,
         ) -> Result<TerrainPatch, ()> {
             unimplemented!()
         }
     }
 
-    pub struct TerrainPatch {}
+    pub struct TerrainPatch {
+        size: PatchSize,
+        pos: PatchPosition,
+    }
+
+    impl TerrainPatch {
+        /// Returns the size of the patch.
+        pub fn size(&self) -> &PatchSize {
+            &self.size
+        }
+
+        /// Returns the position of the patch.
+        pub fn position(&self) -> &PatchPosition {
+            &self.pos
+        }
+    }
 }
 
 pub mod avatar;
