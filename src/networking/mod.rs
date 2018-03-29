@@ -10,17 +10,17 @@ use chashmap::CHashMap;
 use crossbeam_channel;
 use data::TerrainPatch;
 use futures::{future, task, Async, Future, Poll};
-use types::{Vector2, DMatrix};
 use opensim_networking::logging::Log;
-use opensim_networking::simulator::Simulator;
 use opensim_networking::services::terrain;
+use opensim_networking::simulator::Simulator;
 use simple_disk_cache::config::{CacheStrategy, DataEncoding};
-use std::collections::HashMap;
-use std::thread;
-use std::sync::{mpsc, Arc, Mutex};
-use std::path::PathBuf;
 use slog::{Drain, Logger};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
 use types::Uuid;
+use types::{DMatrix, Vector2};
 
 /// Manages the interaction between Viewer and Region.
 pub struct RegionManager {
@@ -91,8 +91,10 @@ impl TerrainManagerInner {
                                 position: pos,
                                 region: region_id.clone(),
                                 land_heightmap: patch.to_data(),
-                                // TODO: this resize should be checked.
-                                //land_heightmap: patch.data().clone().resize_generic(U256::name(), U256::name(), -1.),
+                                /* TODO: this resize should be checked.
+                                 *land_heightmap:
+                                 * patch.data().clone().resize_generic(U256::name(),
+                                 * U256::name(), -1.), */
                             },
                         )?;
                         debug!(self.logger, "Cached terrain patch for: {:?}", patch_handle);

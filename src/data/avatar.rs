@@ -1,9 +1,9 @@
-use data::{Matrix4, PointLocator, Quaternion, RegionLocator, UnitQuaternion, Uuid, Vector2,
-           Vector3};
-use std::f32::consts::PI;
 use alga::linear::AffineTransformation;
 use alga::linear::Similarity;
+use data::{Matrix4, PointLocator, Quaternion, RegionLocator, UnitQuaternion, Uuid, Vector2,
+           Vector3};
 use glium::glutin;
+use std::f32::consts::PI;
 
 /// Anything which can be rendered like an avatar.
 pub trait Avatar {
@@ -32,11 +32,24 @@ pub struct ClientAvatar {
 pub struct OtherAvatar {}
 
 lazy_static! {
-    static ref WORLD_TO_DISPLAY: Matrix4<f32> =
-        Matrix4::new(1., 0., 0., 0.,
-                     0., 0., 1., 0.,
-                     0., 1., 0., 0.,
-                     0., 0., 0., 1.);
+    static ref WORLD_TO_DISPLAY: Matrix4<f32> = Matrix4::new(
+        1.,
+        0.,
+        0.,
+        0.,
+        0.,
+        0.,
+        1.,
+        0.,
+        0.,
+        1.,
+        0.,
+        0.,
+        0.,
+        0.,
+        0.,
+        1.
+    );
 }
 
 // TODO: See opensim_networking::systems::agent_update.

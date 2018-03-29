@@ -4,10 +4,10 @@
 //!       and might not really represent what we want to have in the final
 //!       viewer at all.
 
-use toml;
 use std::fs::File;
-use std::path::Path;
 use std::io::Read;
+use std::path::Path;
+use toml;
 
 #[derive(Deserialize)]
 pub struct Config {

@@ -5,13 +5,13 @@
 use data;
 use data::World;
 use data::avatar::ClientAvatar;
-use glium::{self, glutin, Surface};
 use glium::index::PrimitiveType;
-use types::Vector3;
-use std::time::{Duration, Instant};
-use std::thread;
+use glium::{self, glutin, Surface};
 use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
 use typed_rwlock::RwLockReader;
+use types::Vector3;
 
 pub fn render_world(world: RwLockReader<World>) {
     // Setup display.

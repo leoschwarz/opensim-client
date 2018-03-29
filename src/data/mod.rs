@@ -10,38 +10,36 @@
 // could be skipped and other rendering work be performed, before it is
 // unlocked again.
 
-use types::{DMatrix, Matrix4, Quaternion, UnitQuaternion, Vector2, Vector3};
-use types::nalgebra::{Matrix, MatrixVec};
-use types::nalgebra::core::dimension::U256;
-pub use opensim_networking::types::Uuid;
 use std::collections::HashMap;
+use types::nalgebra::{Matrix, MatrixVec};
+use types::{DMatrix, Matrix4, Quaternion, UnitQuaternion, Uuid, Vector2, Vector3};
 
-mod ecs {
-    use specs::{Component, BTreeStorage, System, World};
+/// Managment of the various identifiers, often UUIDs are mapped to usize values
+/// so they can be used in other places to save memory.
+pub mod ids {
+    use types::Uuid;
 
-    pub struct Terrain {
+    // TODO replace by u32, u64 or usize
+    pub type RegionId = Uuid;
+}
 
+pub mod terrain {
+    use data::ids;
+
+    pub struct TerrainStorage {}
+
+    impl TerrainStorage {
+        pub fn get_patch(
+            &self,
+            region: &ids::RegionId,
+            patch_size: (),
+            patch_pos: (),
+        ) -> Result<TerrainPatch, ()> {
+            unimplemented!()
+        }
     }
 
-    impl Component for Terrain {
-        // TODO: In the future, reconsider all storage choices.
-        type Storage = BTreeStorage<Self>;
-    }
-
-    pub struct Region {
-
-    }
-
-    impl Component for Region {
-        type Storage = BTreeStorage<Self>;
-    }
-
-    pub fn new_world() -> World {
-        let mut world = World::new();
-        world.register::<Terrain>();
-        world.register::<Region>();
-        world
-    }
+    pub struct TerrainPatch {}
 }
 
 pub mod avatar;
@@ -192,8 +190,9 @@ pub mod locators {
     /// Locates a patch in a region.
     ///
     /// Each region is sliced into 256x256 size patches for these purposes.
-    /// (Justification: Maybe 512 might have been a bit more efficient, but it would have made
-    ///  things more complicated as 256 size regions would have to be handled differently.)
+    /// (Justification: Maybe 512 might have been a bit more efficient, but it
+    /// would have made things more complicated as 256 size regions would
+    /// have to be handled differently.)
     #[derive(Clone, Debug)]
     pub struct PatchLocator {
         pub region: RegionLocator,
