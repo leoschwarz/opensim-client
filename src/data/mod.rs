@@ -101,6 +101,7 @@ pub mod region {
         */
     }
 
+    #[derive(Clone)]
     pub struct Region {
         /// The UUID of the region (on the sim).
         uuid: Uuid,
@@ -119,6 +120,10 @@ pub mod region {
                 id,
                 dimensions,
             }
+        }
+
+        pub fn dimensions(&self) -> &RegionDimensions {
+            &self.dimensions
         }
     }
 
@@ -148,6 +153,16 @@ pub mod region {
 
         /// The connection to the region was dropped.
         Disconnected,
+    }
+
+    impl Connection {
+        /// This will clone the region if connected.
+        pub fn clone_region(&self) -> Option<Region> {
+            match *self {
+                Connection::Connected(ref region) => Some(region.clone()),
+                _ => None,
+            }
+        }
     }
 }
 

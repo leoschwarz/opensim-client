@@ -14,15 +14,15 @@ use typed_rwlock::{RwLockReader, RwLockWriter};
 use types::Vector3;
 
 pub mod terrain_land {
-    use data::{self, ids};
     use data::region::RegionDimensions;
     use data::terrain::{self, TerrainStorage};
-    use types::{nalgebra, DMatrix, Vector2};
-    use std::sync::Arc;
+    use data::{self, ids};
     use failure::Error;
+    use std::sync::Arc;
+    use types::{nalgebra, DMatrix, Vector2};
 
     #[derive(Copy, Clone)]
-    struct Vertex {
+    pub struct Vertex {
         position: [f32; 3],
         //color: [f32; 3],
     }
@@ -30,89 +30,123 @@ pub mod terrain_land {
     implement_vertex!(Vertex, position);
 
     /// Render state for land layer terrain data of one region.
-    struct RenderState {
+    pub struct RenderState {
         region_id: ids::RegionId,
         vertices: Vec<Vertex>,
+        /// Current write offset.
+        vertices_offset: usize,
+
+        /// Number of vertices per patch.
+        v_per_patch: usize,
 
         /// Patches which yet have to be added the vertices vector.
         patches_pending: Vec<data::terrain::PatchPosition>,
     }
 
     impl RenderState {
-        fn new(region_id: ids::RegionId, reg_dims: &RegionDimensions) -> Self {
-            let pps = reg_dims.patches_per_side;
+        pub fn new(region_id: ids::RegionId, reg_dims: &RegionDimensions) -> Self {
+            let pps = reg_dims.patches_per_side as usize;
 
             let mut patches_pending = Vec::new();
             for patch_x in 0..pps {
                 for patch_y in 0..pps {
-                    patches_pending.push(Vector2::new(patch_x, patch_y));
+                    patches_pending.push(Vector2::new(patch_x as u8, patch_y as u8));
                 }
+            }
+
+            let mut vertices = Vec::new();
+            let n_patches = pps * pps;
+            // TODO don't hardcode!!!
+            let v_per_patch = 6 * (16 - 1) * (16 - 1);
+            let v_tot = n_patches * v_per_patch;
+            for _ in 0..v_tot {
+                vertices.push(Vertex {
+                    position: [0., 0., 0.],
+                });
             }
 
             RenderState {
                 region_id,
-                vertices: Vec::new(),
+                vertices,
+                vertices_offset: 0,
+                v_per_patch,
                 patches_pending,
             }
         }
 
-        pub fn update(&mut self, storage: Arc<TerrainStorage>) -> Result<(), Error> {
-            let mut res = Ok(());
+        /// Tries to update the vertices with new available terrain patches.
+        ///
+        /// Returns an error if there was one. Otherwise, if and only if some
+        /// new vertices are added `Ok(true)` is returned, else
+        /// `Ok(false)`.
+        pub fn update(&mut self, storage: Arc<TerrainStorage>) -> Result<bool, Error> {
+            let mut res: Result<(), Error> = Ok(());
 
             let region_id = self.region_id.clone();
             let mut patches = Vec::new();
-            self.patches_pending.retain(|&pos| {
-                match storage.get_patch(&(region_id, pos)) {
-                    Ok(patch) => { patches.push(patch); false }
-                    Err(terrain::StorageError::NotFound) => { true }
+            self.patches_pending
+                .retain(|&pos| match storage.get_patch(&(region_id, pos)) {
+                    Ok(patch) => {
+                        patches.push(patch);
+                        false
+                    }
+                    Err(terrain::StorageError::NotFound) => true,
                     Err(terrain::StorageError::Cache(e)) => {
                         res = Err(e.into());
                         true
                     }
-                }
-            });
+                });
 
             for patch in patches.iter() {
-                add_vertices(patch, &mut self.vertices);
+                self.add_vertices(patch);
             }
 
-            res
+            res?;
+            Ok(patches.len() > 0)
         }
-    }
 
-    /// Add vertices for the provided patch to the vertices vector.
-    ///
-    /// For each grid cell two triangles, i.e. 6 vertices, are inserted.
-    fn add_vertices(patch: &data::terrain::TerrainPatch, vertices: &mut Vec<Vertex>)
-    {
-        let size = patch.size();
-        let offset = Vector2::new(patch.position()[0] as usize * size, patch.position()[1] as usize * size);
+        pub fn get_vertices(&self) -> &[Vertex] {
+            &self.vertices[..]
+        }
 
-        for x in 0..size {
-            for y in 0..size {
-                let mut add_vertex = |x: usize, y: usize| {
-                    vertices.push(Vertex {
-                        position: [x as f32, y as f32, patch.land_heightmap()[(x, y)]]
-                    });
-                };
+        /// For each grid cell two triangles, i.e. 6 vertices, are inserted.
+        fn add_vertices(&mut self, patch: &data::terrain::TerrainPatch) {
+            let size = patch.size();
+            let offset = Vector2::new(
+                patch.position()[0] as usize * size,
+                patch.position()[1] as usize * size,
+            );
 
-                let x1 = x + offset[0] as usize;
-                let y1 = y + offset[1] as usize;
-                let x2 = x1 + 1;
-                let y2 = y1 + 1;
+            for x1 in 0..(size - 1) {
+                for y1 in 0..(size - 1) {
+                    let mut add_vertex = |x_rel: usize, y_rel: usize| {
+                        let x_abs = x_rel + offset[0] as usize;
+                        let y_abs = y_rel + offset[1] as usize;
+                        self.vertices[self.vertices_offset] = Vertex {
+                            position: [
+                                x_abs as f32,
+                                y_abs as f32,
+                                patch.land_heightmap()[(x_rel, y_rel)],
+                            ],
+                        };
+                        self.vertices_offset += 1;
+                    };
 
-                add_vertex(x1, y1);
-                add_vertex(x2, y1);
-                add_vertex(x1, y2);
+                    let x2 = x1 + 1;
+                    let y2 = y1 + 1;
 
-                add_vertex(x2, y2);
-                add_vertex(x1, y2);
-                add_vertex(x2, y1);
+                    add_vertex(x1, y1);
+                    add_vertex(x2, y1);
+                    add_vertex(x1, y2);
+
+                    add_vertex(x2, y2);
+                    add_vertex(x1, y2);
+                    add_vertex(x2, y1);
+                }
             }
         }
     }
 }
-
 
 pub fn render_world(storage: Storage) {
     // Setup display.
@@ -122,53 +156,35 @@ pub fn render_world(storage: Storage) {
     let context = glutin::ContextBuilder::new().with_depth_buffer(24);
     let display = glium::Display::new(window, context, &events_loop).unwrap();
 
-    // TODO
-    let terrain_patch = data::terrain::TerrainPatch::dummy();
-
-    // Build the vertex buffer.
-    let vertex_buffer = {
-    #[derive(Copy, Clone)]
-    struct Vertex {
-        position: [f32; 3],
-        //color: [f32; 3],
-    }
-
-    implement_vertex!(Vertex, position);
-        // Convert the heightmap to vertices, each grid cell is represented by
-        // two triangles, i.e. 6 vertices.
-        let mut vertices = Vec::new();
-        for x1 in 0..255 {
-            for y1 in 0..255 {
-                let mut add_vertex = |x: usize, y: usize| {
-                    vertices.push(Vertex {
-                        position: [x as f32, y as f32, terrain_patch.land_heightmap()[(x, y)]],
-                    });
-                };
-
-                let x2 = x1 + 1;
-                let y2 = y1 + 1;
-
-                add_vertex(x1, y1);
-                add_vertex(x2, y1);
-                add_vertex(x1, y2);
-
-                add_vertex(x2, y2);
-                add_vertex(x1, y2);
-                add_vertex(x2, y1);
-            }
-        }
-
-        glium::VertexBuffer::new(&display, &vertices[..]).unwrap()
-    };
-
-    // compiling shaders and linking them together
+    // Compile the shaders, and link them together.
     let program = program!(&display,
         140 => {
             vertex: include_str!("../../shader/terrain_land.vert"),
             fragment: include_str!("../../shader/terrain_land.frag"),
         },
-
     ).unwrap();
+
+    // Wait for region connection. (TODO loading screen.)
+    while storage.client_avatar.read().current_region().is_none() {
+        thread::sleep(Duration::from_millis(50));
+    }
+
+    let region_id = storage
+        .client_avatar
+        .read()
+        .current_region()
+        .clone()
+        .unwrap();
+    let region_conn = storage.region.get(&region_id).unwrap();
+    let region = region_conn.clone_region().unwrap();
+
+    let pps = region.dimensions().patches_per_side as usize;
+    // TODO: Don't hardcode 256, but use patch_size*patch_size once included in
+    // RegionDimensions.
+    let n_vertices = 6 * pps * pps * (16 - 1) * (16 - 1);
+
+    let mut render_state = terrain_land::RenderState::new(region_id, region.dimensions());
+    let v_buffer = glium::VertexBuffer::empty_dynamic(&display, n_vertices).unwrap();
 
     // let mut camera = camera::CameraState::new();
     let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
@@ -192,7 +208,7 @@ pub fn render_world(storage: Storage) {
         let mut target = display.draw();
         target.clear_color_and_depth((0.0, 0.0, 0.0, 0.0), 1.0);
         target
-            .draw(&vertex_buffer, &index_buffer, &program, &uniforms, &params)
+            .draw(&v_buffer, &index_buffer, &program, &uniforms, &params)
             .unwrap();
         target.finish().unwrap();
     };
@@ -204,6 +220,11 @@ pub fn render_world(storage: Storage) {
     let mut accumulator = Duration::new(0, 0);
     let mut previous_clock = Instant::now();
     loop {
+        // Update as needed.
+        if render_state.update(Arc::clone(&storage.terrain)).unwrap() {
+            v_buffer.write(render_state.get_vertices())
+        }
+
         // Draw the frame.
         // camera.update();
         redraw(&storage.client_avatar);
