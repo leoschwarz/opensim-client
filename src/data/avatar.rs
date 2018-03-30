@@ -4,10 +4,6 @@ use data::{Matrix4, PointLocator, Quaternion, RegionLocator, UnitQuaternion, Uui
            Vector3};
 use glium::glutin;
 use std::f32::consts::PI;
-use typed_rwlock;
-
-pub type ClientAvatarReader = typed_rwlock::RwLockReader<ClientAvatar>;
-pub type ClientAvatarWriter = typed_rwlock::RwLockWriter<ClientAvatar>;
 
 /// Anything which can be rendered like an avatar.
 pub trait Avatar {
@@ -60,12 +56,12 @@ lazy_static! {
 // pub fn to_update_message(&self, session_id: Uuid) -> AgentUpdate
 // (note: this belongs into the network module and not here)
 impl ClientAvatar {
-    pub fn new() -> (ClientAvatarReader, ClientAvatarWriter) {
+    pub fn new() -> Self {
         // TODO dummy
 
         let z_axis = Vector3::z_axis();
 
-        let avatar = ClientAvatar {
+        ClientAvatar {
             agent_id: Uuid::nil(),
             loc: PointLocator {
                 region: RegionLocator {
@@ -83,9 +79,7 @@ impl ClientAvatar {
             pressed_right: false,
             pressed_up: false,
             pressed_down: false,
-        };
-
-        typed_rwlock::new(avatar)
+        }
     }
 
     pub fn handle_key(&mut self, key: glutin::VirtualKeyCode, pressed: bool) -> bool {

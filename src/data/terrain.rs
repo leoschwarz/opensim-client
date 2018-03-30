@@ -1,10 +1,11 @@
 use cache::TerrainCache;
-use data::avatar::ClientAvatarReader;
+use data::avatar::ClientAvatar;
 use data::{config, ids};
 use failure::Error;
+use parking_lot::RwLock;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use types::{DMatrix, Uuid, Vector2};
 
 pub type PatchPosition = Vector2<u8>;
@@ -25,7 +26,7 @@ pub enum StorageError {
 /// to the client avatar position, and a disk cache for patches further
 /// away.
 pub struct TerrainStorage {
-    client_avatar: ClientAvatarReader,
+    client_avatar: Arc<RwLock<ClientAvatar>>,
     // TODO Remove entries once they are too far away from the avatar.
     //      This could also be implemented in a dedicated method to be
     //      called from the client update functionality.
@@ -41,7 +42,10 @@ impl TerrainStorage {
         true
     }
 
-    pub fn new(paths: &config::Paths, client_avatar: ClientAvatarReader) -> Result<Self, Error> {
+    pub fn new(
+        paths: &config::Paths,
+        client_avatar: Arc<RwLock<ClientAvatar>>,
+    ) -> Result<Self, Error> {
         use simple_disk_cache as sdc;
 
         // Setup disk cache.

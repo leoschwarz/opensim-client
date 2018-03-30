@@ -79,16 +79,15 @@ fn main() {
     };
     let (world_reader, world_writer) = typed_rwlock::new(world);
 
-    // Setup client avatar.
-    let (client_avatar_reader, client_avatar_writer) = data::avatar::ClientAvatar::new();
-
     // Setup storage managers.
     let paths = data::config::Paths {};
+    let client_avatar = Arc::new(RwLock::new(data::avatar::ClientAvatar::new()));
     let storage = data::Storage {
         terrain: Arc::new(
-            data::terrain::TerrainStorage::new(&paths, client_avatar_reader)
+            data::terrain::TerrainStorage::new(&paths, Arc::clone(&client_avatar))
                 .expect("setup terrain storage failed"),
         ),
+        client_avatar,
     };
 
     // Connect to the simulator.
@@ -136,5 +135,5 @@ fn main() {
         })
         .unwrap();
 
-    render::render_world(world_reader, client_avatar_writer, storage);
+    render::render_world(world_reader, storage);
 }

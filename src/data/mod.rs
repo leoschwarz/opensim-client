@@ -1,15 +1,7 @@
 //! This module contains the types which represent the data that represents the
 //! state of the simulator and is to be rendered on the screen.
 
-// TODO: For now the solution with the typed_rwlock around World is good enough.
-// However in the future there should be a lot more granular control about
-// locking because for example if a terrain patch is received it makes no sense
-// to also lock something completely different.
-// This could have a huge performance impact.
-// What would be really nice to explore would be how far currently locked things
-// could be skipped and other rendering work be performed, before it is
-// unlocked again.
-
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use types::nalgebra::{Matrix, MatrixVec};
@@ -43,7 +35,7 @@ pub mod ids {
 pub mod avatar;
 pub mod terrain;
 
-///
+/// Contains the various storages for the various entities.
 ///
 /// Note: Using Arc inside this struct has the advantages, that where needed
 ///       that storage can be directly referenced instead of having to always
@@ -51,6 +43,7 @@ pub mod terrain;
 #[derive(Clone)]
 pub struct Storage {
     pub terrain: Arc<terrain::TerrainStorage>,
+    pub client_avatar: Arc<RwLock<avatar::ClientAvatar>>,
 }
 
 /*  */

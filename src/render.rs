@@ -2,21 +2,18 @@
 //!
 //! Targets OpenGL 3.1 and GLSL 1.40 for now.
 
-use data::avatar::{ClientAvatar, ClientAvatarWriter};
+use data::avatar::ClientAvatar;
 use data::{self, Storage, World};
 use glium::index::PrimitiveType;
 use glium::{self, glutin, Surface};
+use parking_lot::RwLock;
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 use typed_rwlock::{RwLockReader, RwLockWriter};
 use types::Vector3;
 
-pub fn render_world(
-    world: RwLockReader<World>,
-    client_avatar: RwLockWriter<ClientAvatar>,
-    storage: Storage,
-) {
+pub fn render_world(world: RwLockReader<World>, storage: Storage) {
     // Setup display.
     // TODO: Maybe this does not belong into the render world method?
     let mut events_loop = glutin::EventsLoop::new();
@@ -114,7 +111,7 @@ pub fn render_world(
         ..Default::default()
     };
 
-    let redraw = |avatar: &ClientAvatarWriter| {
+    let redraw = |avatar: &Arc<RwLock<ClientAvatar>>| {
         // Compute he uniforms.
         let uniforms = uniform! {
             persp_matrix: avatar.read().get_persp_matrix().as_ref().clone(),
@@ -131,7 +128,7 @@ pub fn render_world(
     };
 
     // Draw the triangle to the screen.
-    redraw(&client_avatar);
+    redraw(&storage.client_avatar);
 
     // Main loop.
     let mut accumulator = Duration::new(0, 0);
@@ -139,7 +136,7 @@ pub fn render_world(
     loop {
         // Draw the frame.
         // camera.update();
-        redraw(&client_avatar);
+        redraw(&storage.client_avatar);
 
         // Handle events.
         let mut exit = false;
@@ -150,7 +147,7 @@ pub fn render_world(
                     let pressed = input.state == glutin::ElementState::Pressed;
                     match input.virtual_keycode {
                         Some(glutin::VirtualKeyCode::Escape) => {exit = true;}
-                        Some(key) => {client_avatar.write().handle_key(key, pressed);}
+                        Some(key) => {storage.client_avatar.write().handle_key(key, pressed);}
                         _ => {}
                     }
                 }
@@ -173,7 +170,7 @@ pub fn render_world(
             accumulator -= fixed_time_step;
 
             // Update world state.
-            client_avatar.write().update();
+            storage.client_avatar.write().update();
         }
 
         thread::sleep(fixed_time_step - accumulator);
