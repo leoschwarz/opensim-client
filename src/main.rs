@@ -110,6 +110,8 @@ fn main() {
             let region_dims = data::region::RegionDimensions {
                 // TODO
                 patches_per_side: 16,
+                // TODO
+                patch_size_axis: 16,
                 // TODO (VarRegions extension?)
                 side_meters: 256,
             };

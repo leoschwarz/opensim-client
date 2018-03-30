@@ -36,9 +36,6 @@ pub mod terrain_land {
         /// Current write offset.
         vertices_offset: usize,
 
-        /// Number of vertices per patch.
-        v_per_patch: usize,
-
         /// Patches which yet have to be added the vertices vector.
         patches_pending: Vec<data::terrain::PatchPosition>,
     }
@@ -55,10 +52,8 @@ pub mod terrain_land {
             }
 
             let mut vertices = Vec::new();
-            let n_patches = pps * pps;
-            // TODO don't hardcode!!!
-            let v_per_patch = 6 * (16 - 1) * (16 - 1);
-            let v_tot = n_patches * v_per_patch;
+            let v_per_patch = 6 * (reg_dims.patch_size_axis as usize - 1).pow(2);
+            let v_tot = pps * pps * v_per_patch;
             for _ in 0..v_tot {
                 vertices.push(Vertex {
                     position: [0., 0., 0.],
@@ -69,7 +64,6 @@ pub mod terrain_land {
                 region_id,
                 vertices,
                 vertices_offset: 0,
-                v_per_patch,
                 patches_pending,
             }
         }
@@ -105,7 +99,7 @@ pub mod terrain_land {
             Ok(patches.len() > 0)
         }
 
-        pub fn get_vertices(&self) -> &[Vertex] {
+        pub fn vertices(&self) -> &[Vertex] {
             &self.vertices[..]
         }
 
@@ -178,13 +172,11 @@ pub fn render_world(storage: Storage) {
     let region_conn = storage.region.get(&region_id).unwrap();
     let region = region_conn.clone_region().unwrap();
 
-    let pps = region.dimensions().patches_per_side as usize;
-    // TODO: Don't hardcode 256, but use patch_size*patch_size once included in
-    // RegionDimensions.
-    let n_vertices = 6 * pps * pps * (16 - 1) * (16 - 1);
+    //let pps = region.dimensions().patches_per_side as usize;
 
     let mut render_state = terrain_land::RenderState::new(region_id, region.dimensions());
-    let v_buffer = glium::VertexBuffer::empty_dynamic(&display, n_vertices).unwrap();
+    let v_buffer =
+        glium::VertexBuffer::empty_dynamic(&display, render_state.vertices().len()).unwrap();
 
     // let mut camera = camera::CameraState::new();
     let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
@@ -222,7 +214,7 @@ pub fn render_world(storage: Storage) {
     loop {
         // Update as needed.
         if render_state.update(Arc::clone(&storage.terrain)).unwrap() {
-            v_buffer.write(render_state.get_vertices())
+            v_buffer.write(render_state.vertices())
         }
 
         // Draw the frame.

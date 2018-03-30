@@ -134,6 +134,9 @@ pub mod region {
 
         /// Number of patches per side.
         pub patches_per_side: u8,
+
+        /// Size of one patch in one axis (16 for normal regions).
+        pub patch_size_axis: u8,
     }
 
     pub enum Connection {
