@@ -1,11 +1,16 @@
 use cache::TerrainCache;
+use data::avatar::ClientAvatarReader;
 use data::{config, ids};
 use failure::Error;
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::sync::Mutex;
 use types::{DMatrix, Uuid, Vector2};
 
 pub type PatchPosition = Vector2<u8>;
+// TODO: Use and check the patch size where appropriate.
 pub type PatchSize = usize;
+pub type PatchHandle = (ids::RegionId, PatchPosition);
 
 #[derive(Debug, Fail)]
 pub enum StorageError {
@@ -16,56 +21,100 @@ pub enum StorageError {
     Cache(::simple_disk_cache::CacheError),
 }
 
+/// The terrain storage manages both the terrain data for patches close
+/// to the client avatar position, and a disk cache for patches further
+/// away.
 pub struct TerrainStorage {
-    cache: Mutex<TerrainCache>,
+    client_avatar: ClientAvatarReader,
+    // TODO Remove entries once they are too far away from the avatar.
+    //      This could also be implemented in a dedicated method to be
+    //      called from the client update functionality.
+    mem_storage: Mutex<HashMap<PatchHandle, TerrainPatch>>,
+    disk_storage: Mutex<TerrainCache>,
 }
 
 impl TerrainStorage {
-    pub fn new(paths: &config::Paths) -> Result<Self, Error> {
+    /// Returns true if a patch is withing the relevant distance from client
+    /// avatar to be kept in memory.
+    fn within_range(&self, p_pos: &PatchPosition) -> bool {
+        // TODO implement!!!
+        true
+    }
+
+    pub fn new(paths: &config::Paths, client_avatar: ClientAvatarReader) -> Result<Self, Error> {
         use simple_disk_cache as sdc;
 
+        // Setup disk cache.
         let config = sdc::config::CacheConfig {
-            // 128 MiB
+            // 128 MiB (TODO)
             max_bytes: 128 * 1024 * 1024,
             encoding: sdc::config::DataEncoding::Bincode,
             strategy: sdc::config::CacheStrategy::LRU,
             subdirs_per_level: 20,
         };
-        let cache = TerrainCache::initialize(paths.terrain_cache(), config)?;
+        let disk_storage = TerrainCache::initialize(paths.terrain_cache(), config)?;
 
         Ok(TerrainStorage {
-            cache: Mutex::new(cache),
+            client_avatar,
+            mem_storage: Mutex::new(HashMap::new()),
+            disk_storage: Mutex::new(disk_storage),
         })
     }
 
     pub fn put_patch(
         &self,
-        region: &ids::RegionId,
-        patch_pos: &PatchPosition,
-        patch: &TerrainPatch,
+        region: ids::RegionId,
+        patch_pos: PatchPosition,
+        patch: TerrainPatch,
     ) -> Result<(), StorageError> {
-        let mut cache = self.cache.lock().unwrap();
-        cache
-            .put(&(*region, *patch_pos), patch)
-            .map_err(|e| StorageError::Cache(e))
+        // Store to disk in any case.
+        {
+            let mut storage = self.disk_storage.lock().unwrap();
+            storage
+                .put(&(region, patch_pos), &patch)
+                .map_err(|e| StorageError::Cache(e))?;
+        }
+
+        // Store in memory if within relevant distance from avatar.
+        if self.within_range(&patch_pos) {
+            let mut storage = self.mem_storage.lock().unwrap();
+            storage.insert((region, patch_pos), patch);
+        }
+
+        Ok(())
     }
 
     pub fn get_patch(
         &self,
-        region: &ids::RegionId,
-        // TODO
-        //patch_size: &PatchSize,
-        patch_pos: &PatchPosition,
+        patch_handle: &PatchHandle,
+        /* TODO */
+        /* patch_size: &PatchSize, */
     ) -> Result<TerrainPatch, StorageError> {
-        let mut cache = self.cache.lock().unwrap();
-        let res = cache
-            .get(&(*region, *patch_pos))
+        // Check in memory storage first.
+        {
+            let storage = self.mem_storage.lock().unwrap();
+            if let Some(patch) = storage.get(patch_handle) {
+                // TODO: Avoid this clone. Maybe the mem_storage should
+                // hold Arcs (or better Rcs) to the actual data instead of the patches
+                // directly?
+                return Ok(patch.clone());
+            }
+        }
+
+        // Check disk storage if it was not found in memory.
+        let mut storage = self.disk_storage.lock().unwrap();
+        let res = storage
+            .get(patch_handle)
             .map_err(|e| StorageError::Cache(e))?;
-        res.ok_or_else(|| StorageError::NotFound)
+
+        match res {
+            Some(patch) => Ok(patch),
+            None => Err(StorageError::NotFound),
+        }
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TerrainPatch {
     region: ids::RegionId,
     size: PatchSize,

@@ -39,8 +39,8 @@ pub mod ids {
     pub type PersistentRegionId = Uuid;
 }
 
-pub mod terrain;
 pub mod avatar;
+pub mod terrain;
 
 /*  */
 // (old notes)

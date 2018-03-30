@@ -4,16 +4,16 @@
 
 use data;
 use data::World;
-use data::avatar::ClientAvatar;
+use data::avatar::{ClientAvatar, ClientAvatarWriter};
 use glium::index::PrimitiveType;
 use glium::{self, glutin, Surface};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
-use typed_rwlock::RwLockReader;
+use typed_rwlock::{RwLockReader, RwLockWriter};
 use types::Vector3;
 
-pub fn render_world(world: RwLockReader<World>) {
+pub fn render_world(world: RwLockReader<World>, client_avatar: RwLockWriter<ClientAvatar>) {
     // Setup display.
     // TODO: Maybe this does not belong into the render world method?
     let mut events_loop = glutin::EventsLoop::new();
@@ -101,7 +101,6 @@ pub fn render_world(world: RwLockReader<World>) {
     ).unwrap();
 
     // let mut camera = camera::CameraState::new();
-    let mut client_avatar = ClientAvatar::new();
     let index_buffer = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
     let params = glium::DrawParameters {
         depth: glium::Depth {
@@ -112,11 +111,11 @@ pub fn render_world(world: RwLockReader<World>) {
         ..Default::default()
     };
 
-    let redraw = |avatar: &ClientAvatar| {
+    let redraw = |avatar: &ClientAvatarWriter| {
         // Compute he uniforms.
         let uniforms = uniform! {
-            persp_matrix: avatar.get_persp_matrix().as_ref().clone(),
-            view_matrix: avatar.get_view_matrix().as_ref().clone(),
+            persp_matrix: avatar.read().get_persp_matrix().as_ref().clone(),
+            view_matrix: avatar.read().get_view_matrix().as_ref().clone(),
         };
 
         // Draw a frame.
@@ -148,7 +147,7 @@ pub fn render_world(world: RwLockReader<World>) {
                     let pressed = input.state == glutin::ElementState::Pressed;
                     match input.virtual_keycode {
                         Some(glutin::VirtualKeyCode::Escape) => {exit = true;}
-                        Some(key) => {client_avatar.handle_key(key, pressed);}
+                        Some(key) => {client_avatar.write().handle_key(key, pressed);}
                         _ => {}
                     }
                 }
@@ -171,7 +170,7 @@ pub fn render_world(world: RwLockReader<World>) {
             accumulator -= fixed_time_step;
 
             // Update world state.
-            client_avatar.update();
+            client_avatar.write().update();
         }
 
         thread::sleep(fixed_time_step - accumulator);

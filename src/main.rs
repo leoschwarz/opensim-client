@@ -79,6 +79,9 @@ fn main() {
     };
     let (world_reader, world_writer) = typed_rwlock::new(world);
 
+    // Setup client avatar.
+    let (client_avatar_reader, client_avatar_writer) = data::avatar::ClientAvatar::new();
+
     // Connect to the simulator.
     //
     // Note: With the default stack size of 2 MiB this code overflows the stack.
@@ -89,9 +92,13 @@ fn main() {
         .spawn(move || {
             let paths = data::config::Paths {};
             let terrain_storage = Arc::new(
-                data::terrain::TerrainStorage::new(&paths).expect("setup terrain storage failed"),
+                data::terrain::TerrainStorage::new(&paths, client_avatar_reader)
+                    .expect("setup terrain storage failed"),
             );
-            let mut region_manager = Box::new(RegionManager::start(log.clone(), terrain_storage));
+            let mut region_manager = Box::new(RegionManager::start(
+                log.clone(),
+                Arc::clone(&terrain_storage),
+            ));
             let mut reactor = Core::new().unwrap();
             let handle = reactor.handle();
 
@@ -117,9 +124,9 @@ fn main() {
             let region_id = sim.region_info().region_id.clone();
             region_manager.setup_sim(sim);
 
-            let patch_handle = (region_id, Vector2::new(0, 0));
-            let fut = region_manager.terrain_manager.get_patch(patch_handle);
-            let patch = reactor.run(fut).unwrap();
+            //let patch_handle = (region_id, Vector2::new(0, 0));
+            //let fut = region_manager.terrain_manager.get_patch(patch_handle);
+            //let patch = reactor.run(fut).unwrap();
 
             loop {
                 reactor.turn(None);
@@ -127,5 +134,5 @@ fn main() {
         })
         .unwrap();
 
-    render::render_world(world_reader);
+    render::render_world(world_reader, client_avatar_writer);
 }
