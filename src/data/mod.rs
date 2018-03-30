@@ -11,6 +11,7 @@
 // unlocked again.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use types::nalgebra::{Matrix, MatrixVec};
 use types::{DMatrix, Matrix4, Quaternion, UnitQuaternion, Uuid, Vector2, Vector3};
 
@@ -41,6 +42,16 @@ pub mod ids {
 
 pub mod avatar;
 pub mod terrain;
+
+///
+///
+/// Note: Using Arc inside this struct has the advantages, that where needed
+///       that storage can be directly referenced instead of having to always
+///       use the full qualified name.
+#[derive(Clone)]
+pub struct Storage {
+    pub terrain: Arc<terrain::TerrainStorage>,
+}
 
 /*  */
 // (old notes)

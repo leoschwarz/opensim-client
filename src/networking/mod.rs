@@ -7,8 +7,8 @@
 
 use chashmap::CHashMap;
 use crossbeam_channel;
-use data::ids;
 use data::terrain::{self, PatchHandle, TerrainPatch, TerrainStorage};
+use data::{ids, Storage};
 use futures::{future, task, Async, Future, Poll};
 use opensim_networking::logging::Log;
 use opensim_networking::services;
@@ -32,11 +32,11 @@ pub struct RegionManager {
 }
 
 impl RegionManager {
-    pub fn start(log: Log, terrain_storage: Arc<TerrainStorage>) -> Self {
+    pub fn start(log: Log, storage: &Storage) -> Self {
         let terrain_receivers = Arc::new(Mutex::new(services::terrain::Receivers::new()));
 
         let terrain_receivers_ = Arc::clone(&terrain_receivers);
-        let terrain_storage_ = Arc::clone(&terrain_storage);
+        let terrain_storage_ = Arc::clone(&storage.terrain);
 
         thread::spawn(move || {
             let terrain_receivers = Arc::clone(&terrain_receivers_);
@@ -73,7 +73,7 @@ impl RegionManager {
         RegionManager {
             simulators: HashMap::new(),
             log,
-            terrain_storage,
+            terrain_storage: Arc::clone(&storage.terrain),
             terrain_receivers,
         }
     }

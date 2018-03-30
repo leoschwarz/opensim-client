@@ -82,23 +82,25 @@ fn main() {
     // Setup client avatar.
     let (client_avatar_reader, client_avatar_writer) = data::avatar::ClientAvatar::new();
 
+    // Setup storage managers.
+    let paths = data::config::Paths {};
+    let storage = data::Storage {
+        terrain: Arc::new(
+            data::terrain::TerrainStorage::new(&paths, client_avatar_reader)
+                .expect("setup terrain storage failed"),
+        ),
+    };
+
     // Connect to the simulator.
     //
     // Note: With the default stack size of 2 MiB this code overflows the stack.
     // However in general I don't really like this solution of just making
     // the stack bigger.
     let builder = thread::Builder::new().stack_size(16 * 1024 * 1024);
+    let storage_ = storage.clone();
     builder
         .spawn(move || {
-            let paths = data::config::Paths {};
-            let terrain_storage = Arc::new(
-                data::terrain::TerrainStorage::new(&paths, client_avatar_reader)
-                    .expect("setup terrain storage failed"),
-            );
-            let mut region_manager = Box::new(RegionManager::start(
-                log.clone(),
-                Arc::clone(&terrain_storage),
-            ));
+            let mut region_manager = Box::new(RegionManager::start(log.clone(), &storage_));
             let mut reactor = Core::new().unwrap();
             let handle = reactor.handle();
 
@@ -134,5 +136,5 @@ fn main() {
         })
         .unwrap();
 
-    render::render_world(world_reader, client_avatar_writer);
+    render::render_world(world_reader, client_avatar_writer, storage);
 }

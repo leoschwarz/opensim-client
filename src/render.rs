@@ -2,9 +2,8 @@
 //!
 //! Targets OpenGL 3.1 and GLSL 1.40 for now.
 
-use data;
-use data::World;
 use data::avatar::{ClientAvatar, ClientAvatarWriter};
+use data::{self, Storage, World};
 use glium::index::PrimitiveType;
 use glium::{self, glutin, Surface};
 use std::sync::Arc;
@@ -13,7 +12,11 @@ use std::time::{Duration, Instant};
 use typed_rwlock::{RwLockReader, RwLockWriter};
 use types::Vector3;
 
-pub fn render_world(world: RwLockReader<World>, client_avatar: RwLockWriter<ClientAvatar>) {
+pub fn render_world(
+    world: RwLockReader<World>,
+    client_avatar: RwLockWriter<ClientAvatar>,
+    storage: Storage,
+) {
     // Setup display.
     // TODO: Maybe this does not belong into the render world method?
     let mut events_loop = glutin::EventsLoop::new();
