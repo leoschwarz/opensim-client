@@ -142,8 +142,8 @@ impl TerrainPatch {
     }
 
     /// Returns the size of the patch.
-    pub fn size(&self) -> &PatchSize {
-        &self.size
+    pub fn size(&self) -> PatchSize {
+        self.size
     }
 
     /// Returns the position of the patch.

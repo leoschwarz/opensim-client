@@ -13,6 +13,107 @@ use std::time::{Duration, Instant};
 use typed_rwlock::{RwLockReader, RwLockWriter};
 use types::Vector3;
 
+pub mod terrain_land {
+    use data::{self, ids};
+    use data::region::RegionDimensions;
+    use data::terrain::{self, TerrainStorage};
+    use types::{nalgebra, DMatrix, Vector2};
+    use std::sync::Arc;
+    use failure::Error;
+
+    #[derive(Copy, Clone)]
+    struct Vertex {
+        position: [f32; 3],
+        //color: [f32; 3],
+    }
+
+    implement_vertex!(Vertex, position);
+
+    /// Render state for land layer terrain data of one region.
+    struct RenderState {
+        region_id: ids::RegionId,
+        vertices: Vec<Vertex>,
+
+        /// Patches which yet have to be added the vertices vector.
+        patches_pending: Vec<data::terrain::PatchPosition>,
+    }
+
+    impl RenderState {
+        fn new(region_id: ids::RegionId, reg_dims: &RegionDimensions) -> Self {
+            let pps = reg_dims.patches_per_side;
+
+            let mut patches_pending = Vec::new();
+            for patch_x in 0..pps {
+                for patch_y in 0..pps {
+                    patches_pending.push(Vector2::new(patch_x, patch_y));
+                }
+            }
+
+            RenderState {
+                region_id,
+                vertices: Vec::new(),
+                patches_pending,
+            }
+        }
+
+        pub fn update(&mut self, storage: Arc<TerrainStorage>) -> Result<(), Error> {
+            let mut res = Ok(());
+
+            let region_id = self.region_id.clone();
+            let mut patches = Vec::new();
+            self.patches_pending.retain(|&pos| {
+                match storage.get_patch(&(region_id, pos)) {
+                    Ok(patch) => { patches.push(patch); false }
+                    Err(terrain::StorageError::NotFound) => { true }
+                    Err(terrain::StorageError::Cache(e)) => {
+                        res = Err(e.into());
+                        true
+                    }
+                }
+            });
+
+            for patch in patches.iter() {
+                add_vertices(patch, &mut self.vertices);
+            }
+
+            res
+        }
+    }
+
+    /// Add vertices for the provided patch to the vertices vector.
+    ///
+    /// For each grid cell two triangles, i.e. 6 vertices, are inserted.
+    fn add_vertices(patch: &data::terrain::TerrainPatch, vertices: &mut Vec<Vertex>)
+    {
+        let size = patch.size();
+        let offset = Vector2::new(patch.position()[0] as usize * size, patch.position()[1] as usize * size);
+
+        for x in 0..size {
+            for y in 0..size {
+                let mut add_vertex = |x: usize, y: usize| {
+                    vertices.push(Vertex {
+                        position: [x as f32, y as f32, patch.land_heightmap()[(x, y)]]
+                    });
+                };
+
+                let x1 = x + offset[0] as usize;
+                let y1 = y + offset[1] as usize;
+                let x2 = x1 + 1;
+                let y2 = y1 + 1;
+
+                add_vertex(x1, y1);
+                add_vertex(x2, y1);
+                add_vertex(x1, y2);
+
+                add_vertex(x2, y2);
+                add_vertex(x1, y2);
+                add_vertex(x2, y1);
+            }
+        }
+    }
+}
+
+
 pub fn render_world(storage: Storage) {
     // Setup display.
     // TODO: Maybe this does not belong into the render world method?
@@ -26,14 +127,13 @@ pub fn render_world(storage: Storage) {
 
     // Build the vertex buffer.
     let vertex_buffer = {
-        #[derive(Copy, Clone)]
-        struct Vertex {
-            position: [f32; 3],
-            //color: [f32; 3],
-        }
+    #[derive(Copy, Clone)]
+    struct Vertex {
+        position: [f32; 3],
+        //color: [f32; 3],
+    }
 
-        implement_vertex!(Vertex, position);
-
+    implement_vertex!(Vertex, position);
         // Convert the heightmap to vertices, each grid cell is represented by
         // two triangles, i.e. 6 vertices.
         let mut vertices = Vec::new();
@@ -64,38 +164,8 @@ pub fn render_world(storage: Storage) {
     // compiling shaders and linking them together
     let program = program!(&display,
         140 => {
-            vertex: "
-                #version 140
-
-                uniform mat4 persp_matrix;
-                uniform mat4 view_matrix;
-
-                in vec3 position;
-                //in vec3 normal;
-                out vec3 v_position;
-                out vec3 v_normal;
-                out float v_color;
-
-                void main() {
-                    //v_position = position;
-                    //v_normal = normal;
-                    v_normal = vec3(1.0, 0.0, 0.0);
-                    gl_Position = persp_matrix * view_matrix * vec4(position, 1.0);
-                    v_color = position.z / 24.8;
-                }
-            ",
-
-            fragment: "
-                #version 140
-
-                in vec3 v_normal;
-                in float v_color;
-                out vec4 f_color;
-
-                void main() {
-                    f_color = vec4(v_color, 0.5, v_color, 1.0);
-                }
-            "
+            vertex: include_str!("../../shader/terrain_land.vert"),
+            fragment: include_str!("../../shader/terrain_land.frag"),
         },
 
     ).unwrap();
