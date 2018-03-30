@@ -43,7 +43,87 @@ pub mod terrain;
 #[derive(Clone)]
 pub struct Storage {
     pub terrain: Arc<terrain::TerrainStorage>,
+    pub region: Arc<region::RegionStorage>,
     pub client_avatar: Arc<RwLock<avatar::ClientAvatar>>,
+}
+
+pub mod region {
+    use data::ids;
+    use failure::Error;
+    use types::Uuid;
+    use util::bimap::BiMap;
+    use std::sync::{Arc, Mutex};
+    use std::collections::HashMap;
+
+    #[derive(Debug, Fail)]
+    pub enum StorageError {
+        #[fail(display = "Region not registered at all: {}", 0)]
+        NotRegistered(ids::RegionId),
+    }
+
+    pub struct RegionStorage {
+        regions: Mutex<HashMap<ids::RegionId, Arc<Mutex<Connection>>>>,
+    }
+
+    impl RegionStorage {
+        pub fn new() -> Self {
+            RegionStorage {
+                regions: Mutex::new(HashMap::new())
+            }
+        }
+
+        pub fn get(&self, id: &ids::RegionId) -> Result<Arc<Mutex<Connection>>, StorageError> {
+            let regions = self.regions.lock().unwrap();
+            regions.get(id).map(Arc::clone).ok_or_else(|| StorageError::NotRegistered(id.clone()))
+        }
+
+        pub fn get_or_create(&self, id: &ids::RegionId) -> Arc<Mutex<Connection>> {
+            let mut regions = self.regions.lock().unwrap();
+            if let Some(region) = regions.get(id) {
+                return Arc::clone(region);
+            }
+
+            let region = Arc::new(Mutex::new(Connection::Pending));
+            regions.insert(id.clone(), Arc::clone(&region));
+            region
+        }
+    }
+
+    pub struct Region {
+        /// The UUID of the region (on the sim).
+        uuid: Uuid,
+
+        /// The id of the region (in our representation).
+        id: ids::RegionId,
+
+        /// Dimensions of this region.
+        dimensions: RegionDimensions,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct RegionDimensions {
+        /// Side length of the region in meteres.
+        side_meters: u32,
+    }
+
+    pub enum Connection {
+        /// The connection to the region is not yet established.
+        ///
+        /// This should be displayed to the user if needed.
+        Pending,
+
+        /// Connecting to the region failed.
+        ///
+        /// TODO: This should be matchable in the future so the error can
+        ///       be displayed in a nice way to the user.
+        Failed(Error),
+
+        /// The connection to the region is established.
+        Connected(Region),
+
+        /// The connection to the region was dropped.
+        Disconnected,
+    }
 }
 
 /*  */
@@ -91,6 +171,7 @@ pub struct World {
     /* pub client_avatar: RwLock<avatar::ClientAvatar>, */
 }
 
+#[deprecated]
 pub enum RegionConnection {
     /// The connection to the region is not yet established.
     ///
@@ -104,6 +185,7 @@ pub enum RegionConnection {
     Disconnected,
 }
 
+#[deprecated]
 pub struct Region {
     /// The unique ID of the region.
     pub id: Uuid,

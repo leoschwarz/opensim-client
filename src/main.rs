@@ -41,6 +41,7 @@ pub mod config;
 pub mod data;
 pub mod networking;
 pub mod render;
+pub mod util;
 
 fn main() {
     use futures::Future;
@@ -86,6 +87,9 @@ fn main() {
         terrain: Arc::new(
             data::terrain::TerrainStorage::new(&paths, Arc::clone(&client_avatar))
                 .expect("setup terrain storage failed"),
+        ),
+        region: Arc::new(
+            data::region::RegionStorage::new()
         ),
         client_avatar,
     };
