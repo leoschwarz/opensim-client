@@ -74,23 +74,15 @@ fn main() {
     let connect_info = login_response.into();
     let handlers = Handlers::default();
 
-    // Setup world representation.
-    let world = data::World {
-        current_region: data::RegionConnection::Pending,
-    };
-    let (world_reader, world_writer) = typed_rwlock::new(world);
-
     // Setup storage managers.
     let paths = data::config::Paths {};
-    let client_avatar = Arc::new(RwLock::new(data::avatar::ClientAvatar::new()));
+    let client_avatar = Arc::new(RwLock::new(data::avatar::ClientAvatar::new(None)));
     let storage = data::Storage {
         terrain: Arc::new(
             data::terrain::TerrainStorage::new(&paths, Arc::clone(&client_avatar))
                 .expect("setup terrain storage failed"),
         ),
-        region: Arc::new(
-            data::region::RegionStorage::new()
-        ),
+        region: Arc::new(data::region::RegionStorage::new()),
         client_avatar,
     };
 
@@ -113,25 +105,31 @@ fn main() {
                 .unwrap();
             println!("connecting sim finished");
 
-            {
-                let patches_per_side = 16; // TODO
-                let region = data::Region {
-                    id: sim.region_info().region_id.clone(),
-                    // TODO !!!
-                    size: 256,
-                    // TODO !!!
-                    grid_location: Vector2::new(0, 0),
-                };
-                let mut world = world_writer.write();
-                world.current_region = data::RegionConnection::Connected(region);
-            }
+            // Notify region storage of the connected region.
+            let region_uuid = sim.region_info().region_id.clone();
+            let region_dims = data::region::RegionDimensions {
+                // TODO
+                patches_per_side: 16,
+                // TODO (VarRegions extension?)
+                side_meters: 256,
+            };
+            // TODO: grid_location
+            // TODO: patches_size
+            let region =
+                data::region::Region::new(region_uuid.clone(), region_uuid.clone(), region_dims);
+            storage_.region.put(
+                region_uuid.clone(),
+                data::region::Connection::Connected(region),
+            );
 
-            let region_id = sim.region_info().region_id.clone();
+            // Notify the client storage about the current region.
+            storage_
+                .client_avatar
+                .write()
+                .set_current_region(Some(region_uuid));
+
+            // Setup the region manager so terrain data is downloaded etc.
             region_manager.setup_sim(sim);
-
-            //let patch_handle = (region_id, Vector2::new(0, 0));
-            //let fut = region_manager.terrain_manager.get_patch(patch_handle);
-            //let patch = reactor.run(fut).unwrap();
 
             loop {
                 reactor.turn(None);
@@ -139,5 +137,5 @@ fn main() {
         })
         .unwrap();
 
-    render::render_world(world_reader, storage);
+    render::render_world(storage);
 }

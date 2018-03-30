@@ -50,10 +50,10 @@ pub struct Storage {
 pub mod region {
     use data::ids;
     use failure::Error;
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
     use types::Uuid;
     use util::bimap::BiMap;
-    use std::sync::{Arc, Mutex};
-    use std::collections::HashMap;
 
     #[derive(Debug, Fail)]
     pub enum StorageError {
@@ -62,21 +62,32 @@ pub mod region {
     }
 
     pub struct RegionStorage {
-        regions: Mutex<HashMap<ids::RegionId, Arc<Mutex<Connection>>>>,
+        regions: Mutex<HashMap<ids::RegionId, Arc<Connection>>>,
     }
 
     impl RegionStorage {
         pub fn new() -> Self {
             RegionStorage {
-                regions: Mutex::new(HashMap::new())
+                regions: Mutex::new(HashMap::new()),
             }
         }
 
-        pub fn get(&self, id: &ids::RegionId) -> Result<Arc<Mutex<Connection>>, StorageError> {
+        /// Warning: Don't store the results, if you want updated values, you
+        /// have to call this method again.
+        pub fn get(&self, id: &ids::RegionId) -> Result<Arc<Connection>, StorageError> {
             let regions = self.regions.lock().unwrap();
-            regions.get(id).map(Arc::clone).ok_or_else(|| StorageError::NotRegistered(id.clone()))
+            regions
+                .get(id)
+                .map(Arc::clone)
+                .ok_or_else(|| StorageError::NotRegistered(id.clone()))
         }
 
+        pub fn put(&self, id: ids::RegionId, connection: Connection) {
+            let mut regions = self.regions.lock().unwrap();
+            regions.insert(id, Arc::new(connection));
+        }
+
+        /*
         pub fn get_or_create(&self, id: &ids::RegionId) -> Arc<Mutex<Connection>> {
             let mut regions = self.regions.lock().unwrap();
             if let Some(region) = regions.get(id) {
@@ -87,6 +98,7 @@ pub mod region {
             regions.insert(id.clone(), Arc::clone(&region));
             region
         }
+        */
     }
 
     pub struct Region {
@@ -100,10 +112,23 @@ pub mod region {
         dimensions: RegionDimensions,
     }
 
+    impl Region {
+        pub fn new(uuid: Uuid, id: ids::RegionId, dimensions: RegionDimensions) -> Self {
+            Region {
+                uuid,
+                id,
+                dimensions,
+            }
+        }
+    }
+
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct RegionDimensions {
         /// Side length of the region in meteres.
-        side_meters: u32,
+        pub side_meters: u32,
+
+        /// Number of patches per side.
+        pub patches_per_side: u8,
     }
 
     pub enum Connection {
@@ -126,6 +151,7 @@ pub mod region {
     }
 }
 
+/*
 /*  */
 // (old notes)
 // - Should manage the current region and the ones adjacent to it.
@@ -196,6 +222,7 @@ pub struct Region {
     /// The location of the region on the grid.
     pub grid_location: Vector2<u32>,
 }
+*/
 
 // TODO: I'm very unhappy with these.
 pub mod locators {

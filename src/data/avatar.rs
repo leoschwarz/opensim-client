@@ -1,5 +1,6 @@
 use alga::linear::AffineTransformation;
 use alga::linear::Similarity;
+use data::ids;
 use data::{Matrix4, PointLocator, Quaternion, RegionLocator, UnitQuaternion, Uuid, Vector2,
            Vector3};
 use glium::glutin;
@@ -15,6 +16,9 @@ pub trait Avatar {
 /// The main avatar of the client, i.e. the one is used for interacting
 /// with the world.
 pub struct ClientAvatar {
+    // TODO: More detail about the position or a dedicated struct.
+    current_region: Option<ids::RegionId>,
+
     agent_id: Uuid,
     loc: PointLocator,
     // TODO: not used right now
@@ -56,12 +60,13 @@ lazy_static! {
 // pub fn to_update_message(&self, session_id: Uuid) -> AgentUpdate
 // (note: this belongs into the network module and not here)
 impl ClientAvatar {
-    pub fn new() -> Self {
+    pub fn new(current_region: Option<ids::RegionId>) -> Self {
         // TODO dummy
 
         let z_axis = Vector3::z_axis();
 
         ClientAvatar {
+            current_region,
             agent_id: Uuid::nil(),
             loc: PointLocator {
                 region: RegionLocator {
@@ -80,6 +85,14 @@ impl ClientAvatar {
             pressed_up: false,
             pressed_down: false,
         }
+    }
+
+    pub fn current_region(&self) -> &Option<ids::RegionId> {
+        &self.current_region
+    }
+
+    pub fn set_current_region(&mut self, reg: Option<ids::RegionId>) {
+        self.current_region = reg;
     }
 
     pub fn handle_key(&mut self, key: glutin::VirtualKeyCode, pressed: bool) -> bool {
